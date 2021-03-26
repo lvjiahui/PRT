@@ -14,27 +14,14 @@ void Platform::framebuffer_size_callback(GLFWwindow *window, int width, int heig
 	glViewport(0, 0, width, height);
 }
 
-//whenever the mouse moves, this callback is called
-void Platform::mouse_callback(GLFWwindow *window, double xpos, double ypos)
+// glfw: whenever the mouse moves, this callback is called
+// -------------------------------------------------------
+void Platform::mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
 	if (ImGui::GetIO().WantCaptureMouse)
 		return;
-	auto app = (App *)glfwGetWindowUserPointer(window);
+	auto *app = (App *)glfwGetWindowUserPointer(window);
 	auto &camera = app->camera;
-
-	if (camera.firstMouse)
-	{
-		camera.lastX = xpos;
-		camera.lastY = ypos;
-		camera.firstMouse = false;
-	}
-
-	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE)
-	{
-		camera.lastX = xpos;
-		camera.lastY = ypos;
-		return;
-	}
 
 	float xoffset = xpos - camera.lastX;
 	float yoffset = camera.lastY - ypos; // reversed since y-coordinates go from bottom to top
@@ -42,6 +29,10 @@ void Platform::mouse_callback(GLFWwindow *window, double xpos, double ypos)
 	camera.lastX = xpos;
 	camera.lastY = ypos;
 
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE)
+	{
+		return;
+	}
 	camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
@@ -53,6 +44,25 @@ void Platform::scroll_callback(GLFWwindow *window, double xoffset, double yoffse
 	App *app = (App *)glfwGetWindowUserPointer(window);
 	auto &camera = app->camera;
 	camera.ProcessMouseScroll(yoffset);
+}
+
+void processInput(GLFWwindow* window)
+{
+	auto* app = (App*)glfwGetWindowUserPointer(window);
+	auto& camera = app->camera;
+
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+		glfwSetWindowShouldClose(window, true);
+
+	auto deltaTime = ImGui::GetIO().DeltaTime;
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		camera.ProcessKeyboard(FORWARD, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		camera.ProcessKeyboard(BACKWARD, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		camera.ProcessKeyboard(LEFT, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
 Platform::Platform() { 
@@ -131,6 +141,7 @@ void Platform::loop(App &app)
 	// Main loop
 	while (!glfwWindowShouldClose(window))
 	{
+        processInput(window);
 		glfwPollEvents();
 
 		begin_frame();

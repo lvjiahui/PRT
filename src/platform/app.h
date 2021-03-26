@@ -14,7 +14,7 @@ public:
 	App(Platform& plt, Shader&& shader);
 	Shader shader;
 	void render();
-	Camera camera = Camera{ Vec3(0.0f, 0.0f, 3.0f) };
+	Camera camera = Camera{ glm::vec3(0.0f, 0.0f, 3.0f) };
 
 private:
 	void clear();

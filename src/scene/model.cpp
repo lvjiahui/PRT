@@ -7,7 +7,7 @@
 // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
 
 
-static Vec3 aiVec(aiVector3D aiv) { return Vec3(aiv.x, aiv.y, aiv.z); }
+static glm::vec3 aiVec(aiVector3D aiv) { return glm::vec3(aiv.x, aiv.y, aiv.z); }
 
 // processes a node in a recursive fashion. Processes each individual mesh located at the node and repeats this process on its children nodes (if any).
 Mesh processMesh(aiMesh* mesh, const aiScene* scene)

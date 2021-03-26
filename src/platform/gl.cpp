@@ -1,5 +1,4 @@
 #include "gl.h"
-#include "lib/mathlib.h"
 #include "util/log.h"
 
 
@@ -89,19 +88,19 @@ void Shader::uniform_block(std::string name, GLuint i) const {
     glUniformBlockBinding(program, idx, i);
 }
 
-void Shader::uniform(std::string name, int count, const Vec2 items[]) const {
+void Shader::uniform(std::string name, int count, const glm::vec2 items[]) const {
     glUniform2fv(loc(name), count, (GLfloat *)items);
 }
 
 void Shader::uniform(std::string name, GLfloat fl) const { glUniform1f(loc(name), fl); }
 
-void Shader::uniform(std::string name, const Mat4 &mat) const {
-    glUniformMatrix4fv(loc(name), 1, GL_FALSE, mat.data);
+void Shader::uniform(std::string name, const glm::mat4 &mat) const {
+    glUniformMatrix4fv(loc(name), 1, GL_FALSE, &mat[0][0]);
 }
 
-void Shader::uniform(std::string name, Vec3 vec3) const { glUniform3fv(loc(name), 1, vec3.data); }
+void Shader::uniform(std::string name, glm::vec3 vec3) const { glUniform3fv(loc(name), 1, &vec3[0]); }
 
-void Shader::uniform(std::string name, Vec2 vec2) const { glUniform2fv(loc(name), 1, vec2.data); }
+void Shader::uniform(std::string name, glm::vec2 vec2) const { glUniform2fv(loc(name), 1, &vec2[0]); }
 
 void Shader::uniform(std::string name, GLint i) const { glUniform1i(loc(name), i); }
 
@@ -178,8 +177,6 @@ Mesh::Mesh(Mesh&& src) {
     src.dirty = true;
     n_elem = src.n_elem;
     src.n_elem = 0;
-    _bbox = src._bbox;
-    src._bbox.reset();
     _verts = std::move(src._verts);
     _idxs = std::move(src._idxs);
 }
@@ -196,8 +193,6 @@ void Mesh::operator=(Mesh&& src) {
     src.dirty = true;
     n_elem = src.n_elem;
     src.n_elem = 0;
-    _bbox = src._bbox;
-    src._bbox.reset();
     _verts = std::move(src._verts);
     _idxs = std::move(src._idxs);
 }
@@ -219,7 +214,7 @@ void Mesh::create() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vert), (GLvoid*)0);
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vert), (GLvoid*)sizeof(Vec3));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vert), (GLvoid*)sizeof(glm::vec3));
     glEnableVertexAttribArray(1);
 
 
@@ -259,11 +254,6 @@ void Mesh::recreate(std::vector<Vert>&& vertices, std::vector<Index>&& indices) 
     dirty = true;
     _verts = std::move(vertices);
     _idxs = std::move(indices);
-
-    _bbox.reset();
-    for (auto& v : _verts) {
-        _bbox.enclose(v.pos);
-    }
     n_elem = (GLuint)_idxs.size();
 }
 
@@ -282,8 +272,6 @@ std::vector<Mesh::Index>& Mesh::edit_indices() {
 const std::vector<Mesh::Vert>& Mesh::verts() const { return _verts; }
 
 const std::vector<Mesh::Index>& Mesh::indices() const { return _idxs; }
-
-BBox Mesh::bbox() const { return _bbox; }
 
 void Mesh::render(Shader& shader) {
     if (dirty)

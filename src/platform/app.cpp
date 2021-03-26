@@ -50,11 +50,11 @@ void App::render_imgui()
 void App::render_3d()
 {
 
-	Mat4 M_model = Mat4::I; //model矩阵，局部坐标变换至世界坐标
+	glm::mat4 M_model(1); //model矩阵，局部坐标变换至世界坐标
 	if (rotate)
-		M_model = Mat4::rotate((float)ImGui::GetTime(), Vec3(0.5f, 1.0f, 0.0f));
-	Mat4 M_view = camera.GetViewMatrix(); //view矩阵，世界坐标变换至观察坐标系
-	Mat4 M_projection = Mat4::project(45.0f, (float)plt.SCR_WIDTH / (float)plt.SCR_HEIGHT, 0.1f);
+		M_model = glm::rotate(M_model, (float)ImGui::GetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
+	glm::mat4 M_view = camera.GetViewMatrix(); //view矩阵，世界坐标变换至观察坐标系
+	glm::mat4 M_projection = glm::perspective(glm::radians(camera.Zoom), (float)plt.SCR_WIDTH / (float)plt.SCR_HEIGHT, 0.1f, 100.f);
 
 
 	shader.bind();
@@ -62,7 +62,7 @@ void App::render_3d()
 	shader.uniform("model", M_model);
 	shader.uniform("view", M_view);
 	shader.uniform("projection", M_projection);
-	shader.uniform("objectColor", Vec3{ .8f, .8f , .8f });
+	shader.uniform("objectColor", glm::vec3{ .8f, .8f , .8f });
 
 	if (model) model->render(shader);
 }

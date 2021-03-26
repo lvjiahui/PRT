@@ -12,7 +12,6 @@ set(ASSIMP_BUILD_PLY_EXPORTER TRUE)
 add_subdirectory("deps/assimp/")
 
 FILE ( GLOB PRT_SOURCES
-    src/lib/*
     src/scene/*
     src/platform/*
     src/util/*

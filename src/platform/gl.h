@@ -3,7 +3,14 @@
 #include <glad/glad.h>
 #include <string>
 #include <fmt/core.h>
-#include "lib/mathlib.h"
+
+#include <glm/vec2.hpp> // glm::vec2
+#include <glm/vec3.hpp> // glm::vec3
+#include <glm/mat4x4.hpp> // glm::mat4
+#include <glm/ext/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale
+#include <glm/ext/matrix_clip_space.hpp> // glm::perspective
+#include <glm/ext/scalar_constants.hpp> // glm::pi
+
 
 namespace Shaders {
 extern const std::string mesh_v, mesh_f;
@@ -24,14 +31,14 @@ public:
     void bind() const;
     void load(std::string vertex, std::string fragment);
 
-    void uniform(std::string name, const Mat4 &mat) const;
-    void uniform(std::string name, Vec3 vec3) const;
-    void uniform(std::string name, Vec2 vec2) const;
+    void uniform(std::string name, const glm::mat4 &mat) const;
+    void uniform(std::string name, glm::vec3 vec3) const;
+    void uniform(std::string name, glm::vec2 vec2) const;
     void uniform(std::string name, GLint i) const;
     void uniform(std::string name, GLuint i) const;
     void uniform(std::string name, GLfloat f) const;
     void uniform(std::string name, bool b) const;
-    void uniform(std::string name, int count, const Vec2 items[]) const;
+    void uniform(std::string name, int count, const glm::vec2 items[]) const;
     void uniform_block(std::string name, GLuint i) const;
 
 private:
@@ -49,8 +56,8 @@ class Mesh {
 public:
     typedef GLuint Index;
     struct Vert {
-        Vec3 pos;
-        Vec3 norm;
+        glm::vec3 pos;
+        glm::vec3 norm;
     };
 
     Mesh();
@@ -68,7 +75,6 @@ public:
     std::vector<Vert> &edit_verts();
     std::vector<Index> &edit_indices();
 
-    BBox bbox() const;
     const std::vector<Vert> &verts() const;
     const std::vector<Index> &indices() const;
     GLuint tris() const;
@@ -78,7 +84,6 @@ private:
     void create();
     void destroy();
 
-    BBox _bbox;
     GLuint vao = 0, vbo = 0, ebo = 0;
     GLuint n_elem = 0;
     bool dirty = true;
