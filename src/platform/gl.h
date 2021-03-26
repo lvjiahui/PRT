@@ -2,6 +2,7 @@
 
 #include <glad/glad.h>
 #include <string>
+#include <filesystem>
 #include <fmt/core.h>
 
 #include <glm/vec2.hpp> // glm::vec2
@@ -11,6 +12,7 @@
 #include <glm/ext/matrix_clip_space.hpp> // glm::perspective
 #include <glm/ext/scalar_constants.hpp> // glm::pi
 
+namespace fs = std::filesystem;
 
 namespace Shaders {
 extern const std::string mesh_v, mesh_f;
@@ -20,7 +22,8 @@ extern const std::string mesh_v, mesh_f;
 class Shader {
 public:
     Shader();
-    Shader(std::string vertex_file, std::string fragment_file);
+    Shader(std::string vertex_code, std::string fragment_code);
+    Shader(fs::path vertex_path, fs::path fragment_path);
     Shader(const Shader &src) = delete;
     Shader(Shader &&src);
     ~Shader();
@@ -29,7 +32,6 @@ public:
     void operator=(Shader &&src);
 
     void bind() const;
-    void load(std::string vertex, std::string fragment);
 
     void uniform(std::string name, const glm::mat4 &mat) const;
     void uniform(std::string name, glm::vec3 vec3) const;
@@ -42,6 +44,7 @@ public:
     void uniform_block(std::string name, GLuint i) const;
 
 private:
+    void load(std::string vertex_code, std::string fragment_code);
     GLuint loc(std::string name) const;
     static bool validate(GLuint program);
 
@@ -69,7 +72,6 @@ public:
     void operator=(const Mesh &src) = delete;
     void operator=(Mesh &&src);
 
-    /// Assumes proper shader is already bound
     void render(Shader &shader);
     void recreate(std::vector<Vert> &&vertices, std::vector<Index> &&indices);
     std::vector<Vert> &edit_verts();
@@ -91,4 +93,61 @@ private:
     std::vector<Vert> _verts;
     std::vector<Index> _idxs;
 
+};
+
+class SkyBox {
+public:
+    SkyBox(std::vector<std::string> faces);
+    void create();
+    void render();
+    ~SkyBox();
+private:
+    GLuint cubemapTexture;
+    Shader skyboxShader;
+    GLuint skyboxVAO = 0, skyboxVBO;
+
+        float skyboxVertices[108] = {
+        // positions          
+        -1.0f,  1.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        -1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f
+    };
 };

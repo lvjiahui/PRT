@@ -4,8 +4,8 @@ int main()
 {
 
 	Platform plt{};
-	App app{ plt, Shader{ Shaders::mesh_v, Shaders::mesh_f } };
-	plt.loop(app);
+	App::setup(plt);
+	plt.loop(App::get());
 
     return 0;
 }

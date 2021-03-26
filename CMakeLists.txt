@@ -15,6 +15,7 @@ FILE ( GLOB PRT_SOURCES
     src/scene/*
     src/platform/*
     src/util/*
+    src/shader/*
     src/main.cpp
     ) 
 add_executable(PRT ${PRT_SOURCES})

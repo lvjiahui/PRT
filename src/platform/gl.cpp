@@ -1,5 +1,8 @@
 #include "gl.h"
+#include "app.h"
 #include "util/log.h"
+#include "util/load.h"
+#include <fstream>
 
 
 namespace Shaders {
@@ -42,11 +45,75 @@ void main()
 } 
 )";
 
+const std::string SkyBox_v = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+
+out vec3 TexCoords;
+
+uniform mat4 projection;
+uniform mat4 view;
+
+void main()
+{
+    TexCoords = aPos;
+    vec4 pos = projection * view * vec4(aPos, 1.0);
+    gl_Position = pos.xyww;
+}  
+)";
+
+const std::string SkyBox_f = R"(
+#version 330 core
+out vec4 FragColor;
+
+in vec3 TexCoords;
+
+uniform samplerCube skybox;
+
+void main()
+{    
+    FragColor = texture(skybox, TexCoords);
+}
+)";
+
 }
 
 Shader::Shader() {}
 
-Shader::Shader(std::string vertex, std::string fragment) { load(vertex, fragment); }
+Shader::Shader(std::string vertex_code, std::string fragment_code) { load(vertex_code, fragment_code); }
+
+Shader::Shader(fs::path vertex_path, fs::path fragmentPath)
+{
+    // 1. retrieve the vertex/fragment source code from filePath
+    std::string vertexCode;
+    std::string fragmentCode;
+    std::ifstream vShaderFile;
+    std::ifstream fShaderFile;
+    // ensure ifstream objects can throw exceptions:
+    vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try
+    {
+        // open files
+        vShaderFile.open(vertex_path);
+        fShaderFile.open(fragmentPath);
+        std::stringstream vShaderStream, fShaderStream;
+        // read file's buffer contents into streams
+        vShaderStream << vShaderFile.rdbuf();
+        fShaderStream << fShaderFile.rdbuf();
+        // close file handlers
+        vShaderFile.close();
+        fShaderFile.close();
+        // convert stream into string
+        vertexCode = vShaderStream.str();
+        fragmentCode = fShaderStream.str();
+    }
+    catch (std::ifstream::failure& e)
+    {
+        fmt::print("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
+    }
+    load(vertexCode, fragmentCode);
+}
 
 Shader::Shader(Shader &&src) {
     program = src.program;
@@ -110,12 +177,12 @@ void Shader::uniform(std::string name, bool b) const { glUniform1i(loc(name), b)
 
 GLuint Shader::loc(std::string name) const { return glGetUniformLocation(program, name.c_str()); }
 
-void Shader::load(std::string vertex, std::string fragment) {
+void Shader::load(std::string vertex_code, std::string fragment_code) {
 
     v = glCreateShader(GL_VERTEX_SHADER);
     f = glCreateShader(GL_FRAGMENT_SHADER);
-    const GLchar *vs_c = vertex.c_str();
-    const GLchar *fs_c = fragment.c_str();
+    const GLchar *vs_c = vertex_code.c_str();
+    const GLchar *fs_c = fragment_code.c_str();
     glShaderSource(v, 1, &vs_c, NULL);
     glShaderSource(f, 1, &fs_c, NULL);
     glCompileShader(v);
@@ -280,4 +347,48 @@ void Mesh::render(Shader& shader) {
     glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, n_elem, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
+}
+
+SkyBox::SkyBox(std::vector<std::string> faces)
+{
+    cubemapTexture = loadCubemap(faces);
+    skyboxShader = Shader{ Shaders::SkyBox_v, Shaders::SkyBox_f };
+    create();
+}
+
+void SkyBox::create()
+{
+    glGenVertexArrays(1, &skyboxVAO);
+    glGenBuffers(1, &skyboxVBO);
+    glBindVertexArray(skyboxVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+}
+
+void SkyBox::render()
+{
+    glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
+    skyboxShader.bind();
+    auto& app = App::get();
+    auto view = glm::mat4(glm::mat3(app.camera.GetViewMatrix())); // remove translation from the view matrix
+    skyboxShader.uniform("view", view);
+    skyboxShader.uniform("projection", app.M_projection);
+    // skybox cube
+    glBindVertexArray(skyboxVAO);
+    skyboxShader.uniform("skybox", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
+    glDepthFunc(GL_LESS); // set depth function back to default
+}
+
+SkyBox::~SkyBox()
+{
+    glDeleteTextures(1, &cubemapTexture);
+    glDeleteBuffers(1, &skyboxVBO);
+    glDeleteVertexArrays(1, &skyboxVAO);
+    skyboxVAO = skyboxVBO = 0;
 }
