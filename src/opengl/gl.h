@@ -15,7 +15,7 @@
 namespace fs = std::filesystem;
 
 namespace Shaders {
-extern const std::string mesh_v, mesh_f;
+extern const std::string SkyBox_v, SkyBox_f;
 
 } // namespace Shaders
 
@@ -57,11 +57,13 @@ private:
 
 class Mesh {
 public:
+    Shader meshShader = Shader{ fs::path{"src/opengl/mesh.vert"}, fs::path{"src/opengl/mesh.frag"} };
     typedef GLuint Index;
     struct Vert {
         glm::vec3 pos;
         glm::vec3 norm;
     };
+    glm::mat4 Mat_model = glm::mat4(1);
 
     Mesh();
     Mesh(std::vector<Vert> &&vertices, std::vector<Index> &&indices);
@@ -72,7 +74,7 @@ public:
     void operator=(const Mesh &src) = delete;
     void operator=(Mesh &&src);
 
-    void render(Shader &shader);
+    void render();
     void recreate(std::vector<Vert> &&vertices, std::vector<Index> &&indices);
     std::vector<Vert> &edit_verts();
     std::vector<Index> &edit_indices();
@@ -97,16 +99,15 @@ private:
 
 class SkyBox {
 public:
-    SkyBox(std::vector<std::string> faces);
+    Shader skyboxShader = Shader{ Shaders::SkyBox_v, Shaders::SkyBox_f };
+    SkyBox();
     void create();
     void render();
     ~SkyBox();
 private:
-    GLuint cubemapTexture;
-    Shader skyboxShader;
     GLuint skyboxVAO = 0, skyboxVBO;
 
-        float skyboxVertices[108] = {
+    float skyboxVertices[108] = {
         // positions          
         -1.0f,  1.0f, -1.0f,
         -1.0f, -1.0f, -1.0f,
@@ -149,5 +150,5 @@ private:
          1.0f, -1.0f, -1.0f,
         -1.0f, -1.0f,  1.0f,
          1.0f, -1.0f,  1.0f
-    };
+    };;
 };

@@ -1,5 +1,4 @@
 #include "load.h"
-#include "platform/gl.h"
 #include <sf_libs/stb_image.h>
 
 GLuint loadCubemap(std::vector<std::string> faces)

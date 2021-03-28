@@ -1,49 +1,10 @@
-#include "gl.h"
-#include "app.h"
+#include "opengl/gl.h"
+#include "platform/app.h"
 #include "util/log.h"
-#include "util/load.h"
 #include <fstream>
 
 
 namespace Shaders {
-
-const std::string mesh_v = R"(
-#version 330 core
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNormal;
-
-out vec3 WorldPos;
-out vec3 Normal;
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-
-void main()
-{
-    WorldPos = vec3(model * vec4(aPos, 1.0));
-    Normal = mat3(transpose(inverse(model))) * aNormal;  
-    
-    gl_Position = projection * view * vec4(WorldPos, 1.0);
-}
-)";
-
-const std::string mesh_f = R"(
-#version 330 core
-out vec4 FragColor;
-
-in vec3 Normal;  
-in vec3 WorldPos;  
-  
-uniform vec3 lightPos; 
-uniform vec3 lightColor;
-uniform vec3 objectColor;
-
-void main()
-{
-    FragColor = vec4(Normal, 1.0);
-} 
-)";
 
 const std::string SkyBox_v = R"(
 #version 330 core
@@ -340,19 +301,26 @@ const std::vector<Mesh::Vert>& Mesh::verts() const { return _verts; }
 
 const std::vector<Mesh::Index>& Mesh::indices() const { return _idxs; }
 
-void Mesh::render(Shader& shader) {
+void Mesh::render() {
     if (dirty)
         update();
-    shader.bind();
+    auto& app = App::get();
+    meshShader.bind();
     glBindVertexArray(vao);
+    meshShader.uniform("skybox", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app.envTexture);
+    meshShader.uniform("model", Mat_model);
+    meshShader.uniform("view", app.camera.GetViewMatrix());
+    meshShader.uniform("projection", app.Mat_projection);
     glDrawElements(GL_TRIANGLES, n_elem, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
 }
 
-SkyBox::SkyBox(std::vector<std::string> faces)
+
+
+SkyBox::SkyBox()
 {
-    cubemapTexture = loadCubemap(faces);
-    skyboxShader = Shader{ Shaders::SkyBox_v, Shaders::SkyBox_f };
     create();
 }
 
@@ -374,12 +342,12 @@ void SkyBox::render()
     auto& app = App::get();
     auto view = glm::mat4(glm::mat3(app.camera.GetViewMatrix())); // remove translation from the view matrix
     skyboxShader.uniform("view", view);
-    skyboxShader.uniform("projection", app.M_projection);
+    skyboxShader.uniform("projection", app.Mat_projection);
     // skybox cube
     glBindVertexArray(skyboxVAO);
     skyboxShader.uniform("skybox", 0);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app.envTexture);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
     glDepthFunc(GL_LESS); // set depth function back to default
@@ -387,7 +355,6 @@ void SkyBox::render()
 
 SkyBox::~SkyBox()
 {
-    glDeleteTextures(1, &cubemapTexture);
     glDeleteBuffers(1, &skyboxVBO);
     glDeleteVertexArrays(1, &skyboxVAO);
     skyboxVAO = skyboxVBO = 0;

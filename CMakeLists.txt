@@ -12,10 +12,10 @@ set(ASSIMP_BUILD_PLY_EXPORTER TRUE)
 add_subdirectory("deps/assimp/")
 
 FILE ( GLOB PRT_SOURCES
-    src/scene/*
     src/platform/*
+    src/opengl/*
     src/util/*
-    src/shader/*
+    src/scene/*
     src/main.cpp
     ) 
 add_executable(PRT ${PRT_SOURCES})
