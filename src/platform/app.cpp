@@ -5,18 +5,20 @@
 App::App(Platform& plt)
 	: plt(plt) {
 
-	model = std::make_unique<Model>("data/buddha.obj");
+	 model = std::make_unique<Model>("data/buddha.obj");
+	//model = std::make_unique<Model>("data/cube.obj");
 
-	std::vector<std::string> faces
-    {
-        "data/skybox/right.jpg",
-        "data/skybox/left.jpg",
-        "data/skybox/top.jpg",
-        "data/skybox/bottom.jpg",
-        "data/skybox/front.jpg",
-        "data/skybox/back.jpg"
-    };
-	envTexture = loadCubemap(faces);
+	// std::vector<std::string> faces
+    // {
+    //     "data/skybox/right.jpg",
+    //     "data/skybox/left.jpg",
+    //     "data/skybox/top.jpg",
+    //     "data/skybox/bottom.jpg",
+    //     "data/skybox/front.jpg",
+    //     "data/skybox/back.jpg"
+    // };
+	// envTexture = loadCubemap(faces);
+	envTexture = load_hdr("data/hdr/newport_loft.hdr");
 
 	sky_box = std::make_unique<SkyBox>();
 }
@@ -51,6 +53,8 @@ void App::render_imgui()
 	ImGui::Begin("PRT");
 	ImGui::Checkbox("Imgui Demo Window", &show_demo_window);
 	ImGui::Checkbox("rotate", &rotate);
+	ImGui::Checkbox("tonemap", &tonemap);
+	ImGui::Checkbox("gamma", &gamma);
 	if (show_demo_window)
 		ImGui::ShowDemoWindow(&show_demo_window);
 

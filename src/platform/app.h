@@ -21,6 +21,9 @@ public:
 	Camera camera = Camera{ glm::vec3(0.0f, 0.0f, 3.0f) };
 	glm::mat4 Mat_projection{ 1 };
 
+	bool tonemap = true;
+	bool gamma = true;
+	
 private:
 	App(Platform& plt);
 	void clear();

@@ -15,7 +15,6 @@
 namespace fs = std::filesystem;
 
 namespace Shaders {
-extern const std::string SkyBox_v, SkyBox_f;
 
 } // namespace Shaders
 
@@ -99,7 +98,7 @@ private:
 
 class SkyBox {
 public:
-    Shader skyboxShader = Shader{ Shaders::SkyBox_v, Shaders::SkyBox_f };
+    Shader skyboxShader = Shader{ fs::path{"src/opengl/env_hdr.vert"}, fs::path{"src/opengl/env_hdr.frag"} };
     SkyBox();
     void create();
     void render();
