@@ -5,8 +5,9 @@
 App::App(Platform& plt)
 	: plt(plt) {
 
-	 model = std::make_unique<Model>("data/buddha.obj");
+	  model = std::make_unique<Model>("data/buddha.obj");
 	//model = std::make_unique<Model>("data/cube.obj");
+	sky_box = std::make_unique<SkyBox>();
 
 	// std::vector<std::string> faces
     // {
@@ -17,15 +18,17 @@ App::App(Platform& plt)
     //     "data/skybox/front.jpg",
     //     "data/skybox/back.jpg"
     // };
-	// envTexture = loadCubemap(faces);
-	envTexture = load_hdr("data/hdr/newport_loft.hdr");
-
-	sky_box = std::make_unique<SkyBox>();
+	// _CubeMap["skyMap"] = loadCubemap(faces);
+	hdr_RectMap = load_hdr("data/hdr/newport_loft.hdr");
 }
 
 void App::setup(Platform& plt)
 {
 	data = new App(plt);
+
+	data->_CubeMap["skyMap"] = equirectangular_to_cubemap(*data->sky_box);
+	data->_CubeMap["irradiance"] = irradiance_map(*data->sky_box);
+
 }
 
 App& App::get()
@@ -39,6 +42,13 @@ void App::render()
 	clear();
 	render_imgui();
 	render_3d();
+}
+
+GLuint App::CubeMap(std::string name)
+{
+	if (!name.empty()) 
+		return _CubeMap[name];
+	return _CubeMap[map_choices[map_current]];
 }
 
 void App::clear()
@@ -55,6 +65,9 @@ void App::render_imgui()
 	ImGui::Checkbox("rotate", &rotate);
 	ImGui::Checkbox("tonemap", &tonemap);
 	ImGui::Checkbox("gamma", &gamma);
+
+    ImGui::ListBox("map", &map_current, map_choices.data(), map_choices.size());
+
 	if (show_demo_window)
 		ImGui::ShowDemoWindow(&show_demo_window);
 
@@ -72,5 +85,8 @@ void App::render_3d()
 			model->Mat_model = glm::rotate(model->Mat_model, (float)ImGui::GetIO().DeltaTime, glm::vec3(0.5f, 1.0f, 0.0f));
 		model->render();
 	}
-	if (sky_box) sky_box->render();
+	if (sky_box) {
+		sky_box->setup_cube();
+		sky_box->render();
+	}
 }

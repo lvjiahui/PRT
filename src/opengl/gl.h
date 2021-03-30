@@ -45,7 +45,7 @@ public:
 private:
     void load(std::string vertex_code, std::string fragment_code);
     GLuint loc(std::string name) const;
-    static bool validate(GLuint program);
+    static bool validate(GLuint program, std::string code={});
 
     GLuint program = 0;
     GLuint v = 0, f = 0;
@@ -98,15 +98,20 @@ private:
 
 class SkyBox {
 public:
-    Shader skyboxShader = Shader{ fs::path{"src/opengl/env_hdr.vert"}, fs::path{"src/opengl/env_hdr.frag"} };
+    Shader skyboxShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/skybox.frag"} };
+    Shader rectangleShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/rectangle2cube.frag"} };
+    Shader irradianceShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/irradiance.frag"} };
     SkyBox();
     void create();
+    void setup_cube();
+    void setup_rectangle(glm::mat4 cam_pos, glm::mat4 cam_view);
+    void setup_irradiance(glm::mat4 cam_pos, glm::mat4 cam_view);
     void render();
     ~SkyBox();
 private:
     GLuint skyboxVAO = 0, skyboxVBO;
 
-    float skyboxVertices[108] = {
+    const float skyboxVertices[108] = {
         // positions          
         -1.0f,  1.0f, -1.0f,
         -1.0f, -1.0f, -1.0f,
@@ -149,5 +154,5 @@ private:
          1.0f, -1.0f, -1.0f,
         -1.0f, -1.0f,  1.0f,
          1.0f, -1.0f,  1.0f
-    };;
+    };
 };
