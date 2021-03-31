@@ -3,13 +3,13 @@ out vec4 FragColor;
 
 in vec3 CubePos;
 
-uniform samplerCube skybox;
+uniform samplerCube environment;
 uniform bool tonemap;
 uniform bool gamma;
 
 void main()
 {   
-    vec3 color = texture(skybox, CubePos).rgb;
+    vec3 color = texture(environment, CubePos).rgb;
     if(tonemap)
         color = color / (color + vec3(1.0));
     if(gamma)

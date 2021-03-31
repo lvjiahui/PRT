@@ -4,19 +4,36 @@ out vec4 FragColor;
 in vec3 Normal;  
 in vec3 WorldPos;  
   
-uniform vec3 objectColor;
+// material parameters
+uniform vec3 albedo;
+uniform bool metal;
+uniform vec3 F0;
+
 uniform vec3 cameraPos;
 uniform bool tonemap;
 uniform bool gamma;
 
-uniform samplerCube skybox;
+uniform samplerCube environment;
 uniform samplerCube irradiance;
+
+const float PI = 3.14159265359;
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
+}
 
 void main()
 {
-    // vec3 I = normalize(WorldPos - cameraPos);
-    // vec3 R = reflect(I, normalize(Normal));
-    vec3 color = texture(skybox, normalize(Normal)).rgb;
+    vec3 N = normalize(Normal);
+    vec3 V = normalize(cameraPos - WorldPos);
+    vec3 R = reflect(-V, N); 
+    vec3 F = fresnelSchlick(max(dot(N, V), 0.0), F0);        
+
+    vec3 color = F * texture(environment, R).rgb; //specular
+    if(!metal)
+        color += albedo/PI * (1 - F) * texture(irradiance, N).rgb; //lambertian
+
     if(tonemap)
         color = color / (color + vec3(1.0));
     if(gamma)

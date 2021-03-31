@@ -5,7 +5,7 @@
 App::App(Platform& plt)
 	: plt(plt) {
 
-	  model = std::make_unique<Model>("data/buddha.obj");
+	   model = std::make_unique<Model>("data/buddha.obj");
 	//model = std::make_unique<Model>("data/cube.obj");
 	sky_box = std::make_unique<SkyBox>();
 
@@ -26,7 +26,7 @@ void App::setup(Platform& plt)
 {
 	data = new App(plt);
 
-	data->_CubeMap["skyMap"] = equirectangular_to_cubemap(*data->sky_box);
+	data->_CubeMap["environment"] = equirectangular_to_cubemap(*data->sky_box);
 	data->_CubeMap["irradiance"] = irradiance_map(*data->sky_box);
 
 }
@@ -46,9 +46,13 @@ void App::render()
 
 GLuint App::CubeMap(std::string name)
 {
-	if (!name.empty()) 
-		return _CubeMap[name];
-	return _CubeMap[map_choices[map_current]];
+	if (name.empty()) 
+		name = map_choices[map_current];
+	if(_CubeMap.find(name) == _CubeMap.end()){
+		fmt::print("can not find cubemap {}\n", name);
+		return -1;
+	}
+	return _CubeMap[name];
 }
 
 void App::clear()
@@ -66,7 +70,14 @@ void App::render_imgui()
 	ImGui::Checkbox("tonemap", &tonemap);
 	ImGui::Checkbox("gamma", &gamma);
 
-    ImGui::ListBox("map", &map_current, map_choices.data(), map_choices.size());
+	ImGui::Separator();
+	ImGui::Checkbox("metal", &metal);
+	ImGui::DragFloat3("metal F0", F0, 0.01, 0, 1);
+	ImGui::DragFloat3("dielectric albedo", albedo, 0.5, 0, 0);
+	ImGui::Separator();
+
+
+    ImGui::ListBox("skybox", &map_current, map_choices.data(), map_choices.size());
 
 	if (show_demo_window)
 		ImGui::ShowDemoWindow(&show_demo_window);

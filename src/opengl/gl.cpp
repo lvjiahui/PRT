@@ -106,7 +106,11 @@ void Shader::uniform(std::string name, GLuint i) const { glUniform1ui(loc(name),
 
 void Shader::uniform(std::string name, bool b) const { glUniform1i(loc(name), b); }
 
-GLuint Shader::loc(std::string name) const { return glGetUniformLocation(program, name.c_str()); }
+GLuint Shader::loc(std::string name) const { 
+    auto location = glGetUniformLocation(program, name.c_str());
+    assert(location!=-1);
+    return location; 
+}
 
 void Shader::load(std::string vertex_code, std::string fragment_code) {
 
@@ -277,15 +281,27 @@ void Mesh::render() {
     auto& app = App::get();
     meshShader.bind();
     glBindVertexArray(vao);
-    meshShader.uniform("skybox", 0);
+    meshShader.uniform("environment", 0);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, app.CubeMap());
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app.CubeMap("environment"));
+    meshShader.uniform("irradiance", 1);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app.CubeMap("irradiance"));
+
     meshShader.uniform("model", Mat_model);
     meshShader.uniform("view", app.camera.GetViewMatrix());
     meshShader.uniform("projection", app.Mat_projection);
     meshShader.uniform("cameraPos", app.camera.Position);
+
     meshShader.uniform("tonemap", app.tonemap);
     meshShader.uniform("gamma", app.gamma);
+
+    meshShader.uniform("metal", app.metal);
+    if (app.metal)
+        meshShader.uniform("F0", glm::vec3{app.F0[0],app.F0[1],app.F0[2]});
+    else
+        meshShader.uniform("F0", glm::vec3{0.04});
+    meshShader.uniform("albedo", glm::vec3{app.albedo[0],app.albedo[1],app.albedo[2]});
     glDrawElements(GL_TRIANGLES, n_elem, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
 }
@@ -313,7 +329,7 @@ void SkyBox::setup_cube()
 {
     auto& app = App::get();
     skyboxShader.bind();
-    skyboxShader.uniform("skybox", 0);
+    skyboxShader.uniform("environment", 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, app.CubeMap());
     skyboxShader.uniform("view", app.camera.GetViewMatrix());
@@ -337,9 +353,9 @@ void SkyBox::setup_irradiance(glm::mat4 cam_pos, glm::mat4 cam_view)
 {
     auto& app = App::get();
     irradianceShader.bind();
-    irradianceShader.uniform("environmentMap", 0);
+    irradianceShader.uniform("environment", 0);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, app.CubeMap("skyMap"));
+    glBindTexture(GL_TEXTURE_CUBE_MAP, app.CubeMap("environment"));
     irradianceShader.uniform("view", cam_view);
     irradianceShader.uniform("projection", cam_pos);
 }

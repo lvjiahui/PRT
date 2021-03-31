@@ -26,6 +26,9 @@ public:
 
 	bool tonemap = true;
 	bool gamma = true;
+	float F0[3] = {0.562, 0.565, 0.578};
+	float albedo[3] = {0.5f, 0.0f, 0.0f};
+	bool metal = false;
 
 private:
 	static inline App* data = nullptr;
@@ -36,11 +39,12 @@ private:
 
 	bool show_demo_window = false;
 	bool rotate = false;
+
 	float depth = 1;
-	
-	const std::vector<const char*> map_choices = { "skyMap", "irradiance" };
+
+	const std::vector<const char*> map_choices = { "environment", "irradiance" };
 	std::map<std::string, GLuint> _CubeMap;
-    int map_current = 1;
+    int map_current = 0;
 
 	ImVec4 clear_color = ImVec4(0.2f, 0.3f, 0.3f, 1.00f);
 	std::unique_ptr<Model> model;
