@@ -164,7 +164,7 @@ Platform::Platform() {
 	ImGui_ImplOpenGL3_Init(glsl_version);
 
 	glEnable(GL_DEPTH_TEST);
-
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);  
 }
 
 Platform::~Platform() { platform_shutdown(); }

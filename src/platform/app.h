@@ -19,7 +19,7 @@ public:
 
 	Platform& plt;
 	GLuint hdr_RectMap;
-	GLuint CubeMap(std::string name = {});
+	CubeMap& EnvMap(std::string name = {});
 
 	Camera camera = Camera{ glm::vec3(0.0f, 0.0f, 3.0f) };
 	glm::mat4 Mat_projection{ 1 };
@@ -29,6 +29,7 @@ public:
 	float F0[3] = {0.562, 0.565, 0.578};
 	float albedo[3] = {0.5f, 0.0f, 0.0f};
 	bool metal = false;
+	float lod = 0;
 
 private:
 	static inline App* data = nullptr;
@@ -39,14 +40,15 @@ private:
 
 	bool show_demo_window = false;
 	bool rotate = false;
+	bool render_model = true;
 
 	float depth = 1;
-
-	const std::vector<const char*> map_choices = { "environment", "irradiance" };
-	std::map<std::string, GLuint> _CubeMap;
+	const std::vector<const char*> map_choices = { "environment", "irradiance", "prefilter" };
+	std::map<std::string, CubeMap> _CubeMap;
     int map_current = 0;
 
 	ImVec4 clear_color = ImVec4(0.2f, 0.3f, 0.3f, 1.00f);
 	std::unique_ptr<Model> model;
-	std::unique_ptr<SkyBox> sky_box;
+	std::unique_ptr<SkyBox> skybox;
+	std::unique_ptr<LightProbe> lightProbe;
 };

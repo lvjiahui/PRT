@@ -2,6 +2,7 @@
 #include "platform/app.h"
 #include "util/log.h"
 #include <fstream>
+#include <sf_libs/stb_image.h>
 
 
 namespace Shaders {
@@ -281,12 +282,8 @@ void Mesh::render() {
     auto& app = App::get();
     meshShader.bind();
     glBindVertexArray(vao);
-    meshShader.uniform("environment", 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, app.CubeMap("environment"));
-    meshShader.uniform("irradiance", 1);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, app.CubeMap("irradiance"));
+    meshShader.uniform("environment", app.EnvMap("environment").active(0));
+    meshShader.uniform("irradiance", app.EnvMap("irradiance").active(1));
 
     meshShader.uniform("model", Mat_model);
     meshShader.uniform("view", app.camera.GetViewMatrix());
@@ -307,6 +304,85 @@ void Mesh::render() {
 }
 
 
+CubeMap::CubeMap(size_t w, size_t h, bool mipmap) : w(w), h(h), mipmap(mipmap)
+{
+    glGenTextures(1, &textName);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textName);
+    for (GLuint i = 0; i < 6; ++i)
+    {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, w, h, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    setup();
+}
+
+CubeMap::CubeMap(std::vector<std::string> paths, bool mipmap) : mipmap(mipmap)
+{
+    glGenTextures(1, &textName);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textName);
+    int nrChannels;
+    for (GLuint i = 0; i < paths.size(); i++)
+    {
+        unsigned char *data = stbi_load(paths[i].c_str(), &w, &h, &nrChannels, 0);
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            stbi_image_free(data);
+        }
+        else
+        {
+            fmt::print("Cubemap texture failed to load at path: {}\n", paths[i] );
+        }
+    }
+    setup();
+}
+
+void CubeMap::setup(){
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    if (mipmap)
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    else
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    if (mipmap)
+        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+};
+
+CubeMap::CubeMap(CubeMap&& other)
+{
+    *this = std::move(other);
+}
+
+CubeMap& CubeMap::operator=(CubeMap&& other)
+{
+    destroy();
+    w = other.w;
+    h = other.h;
+    mipmap = other.mipmap;
+    textName = other.textName;
+    other.textName = 0;
+    return *this;
+}
+
+GLint CubeMap::active(int unit)
+{
+    if (unit == -1)
+        unit = default_unit;
+    glActiveTexture(GL_TEXTURE0 + unit);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textName);
+    return unit;
+}
+
+CubeMap::~CubeMap()
+{
+    destroy();
+}
+void CubeMap::destroy()
+{
+    glDeleteTextures(1, &textName);
+}
+
 
 SkyBox::SkyBox()
 {
@@ -325,40 +401,19 @@ void SkyBox::create()
     glBindVertexArray(0);
 }
 
-void SkyBox::setup_cube()
+void SkyBox::setShader()
 {
     auto& app = App::get();
     skyboxShader.bind();
-    skyboxShader.uniform("environment", 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, app.CubeMap());
+    skyboxShader.uniform("environment", app.EnvMap().active());
     skyboxShader.uniform("view", app.camera.GetViewMatrix());
     skyboxShader.uniform("projection", app.Mat_projection);
     skyboxShader.uniform("tonemap", app.tonemap);
     skyboxShader.uniform("gamma", app.gamma);
+    skyboxShader.uniform("lod", app.lod);
 }
 
-void SkyBox::setup_rectangle(glm::mat4 cam_pos, glm::mat4 cam_view)
-{
-    auto& app = App::get();
-    rectangleShader.bind();
-    rectangleShader.uniform("equirectangularMap", 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, app.hdr_RectMap);
-    rectangleShader.uniform("view", cam_view);
-    rectangleShader.uniform("projection", cam_pos);
-}
 
-void SkyBox::setup_irradiance(glm::mat4 cam_pos, glm::mat4 cam_view)
-{
-    auto& app = App::get();
-    irradianceShader.bind();
-    irradianceShader.uniform("environment", 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, app.CubeMap("environment"));
-    irradianceShader.uniform("view", cam_view);
-    irradianceShader.uniform("projection", cam_pos);
-}
 void SkyBox::render()
 {
     glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
@@ -375,4 +430,87 @@ SkyBox::~SkyBox()
     glDeleteBuffers(1, &skyboxVBO);
     glDeleteVertexArrays(1, &skyboxVAO);
     skyboxVAO = skyboxVBO = 0;
+}
+
+LightProbe::LightProbe(SkyBox& skybox) : skybox(skybox)
+{
+    // setup framebuffer
+    // ----------------------
+    glGenFramebuffers(1, &captureFBO);
+    glGenRenderbuffers(1, &captureRBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+
+
+template <typename Callable>
+void LightProbe::bake(Callable&& render)
+{
+    GLint m_viewport[4];
+    glGetIntegerv(GL_VIEWPORT, m_viewport);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    for (GLuint view = 0; view < 6; ++view)
+    {
+        render(view);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+}
+
+void LightProbe::prefilter(CubeMap& cubemap)
+{
+    if (!cubemap.mipmap) {
+        fmt::print("cubemap should be mipmap\n");
+        return;
+    }
+
+    prefilterShader.bind();
+    prefilterShader.uniform("environment", App::get().EnvMap("environment").active());
+    bake([&cubemap, this](GLuint view) {
+        unsigned int maxMipLevels = 5;
+        for (unsigned int mip = 0; mip < maxMipLevels; ++mip)
+        {
+            float roughness = (float)mip / (float)(maxMipLevels - 1);
+            prefilterShader.uniform("roughness", roughness);
+            set_view(prefilterShader, view, cubemap, mip);
+            skybox.render();
+        }
+    });
+}
+
+void LightProbe::irradiance(CubeMap& cubemap)
+{
+    irradianceShader.bind();
+    irradianceShader.uniform("environment", App::get().EnvMap("environment").active());
+    bake([&cubemap, this](GLuint view) {
+        this->set_view(irradianceShader, view, cubemap);
+        this->skybox.render();
+    });
+}
+
+void LightProbe::equirectangular_to_cubemap(CubeMap& cubemap)
+{
+    rectangleShader.bind();
+    rectangleShader.uniform("equirectangularMap", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, App::get().hdr_RectMap);
+    bake([&cubemap, this](GLuint view) {
+        this->set_view(rectangleShader, view, cubemap);
+        this->skybox.render();
+    });
+}
+
+void LightProbe::set_view(Shader& shader, size_t view, CubeMap& cubemap, GLuint mip)
+{
+    unsigned int mipWidth = cubemap.w * std::pow(0.5, mip);
+    unsigned int mipHeight = cubemap.h * std::pow(0.5, mip);
+    glViewport(0, 0, mipWidth, mipHeight);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + view, cubemap.textName, mip);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    shader.uniform("projection", captureProjection);
+    shader.uniform("view", captureViews[view]);
 }

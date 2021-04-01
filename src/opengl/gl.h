@@ -96,16 +96,33 @@ private:
 
 };
 
+
+
+class CubeMap {
+public:
+    CubeMap() = default;
+    CubeMap(std::vector<std::string> paths, bool mipmap = false);
+    CubeMap(size_t w, size_t h, bool mipmap = false);
+    CubeMap(CubeMap&&);
+    CubeMap& operator=(CubeMap&&);
+    GLint active(int unit = -1);
+    ~CubeMap();
+    int w = 0, h = 0;
+    bool mipmap = false;
+    GLuint textName = 0; // 0 is a reserved texture name
+private:
+    int default_unit = 1;
+    void setup();
+    void destroy();
+};
+
+
 class SkyBox {
 public:
     Shader skyboxShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/skybox.frag"} };
-    Shader rectangleShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/rectangle2cube.frag"} };
-    Shader irradianceShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/irradiance.frag"} };
     SkyBox();
     void create();
-    void setup_cube();
-    void setup_rectangle(glm::mat4 cam_pos, glm::mat4 cam_view);
-    void setup_irradiance(glm::mat4 cam_pos, glm::mat4 cam_view);
+    void setShader();
     void render();
     ~SkyBox();
 private:
@@ -154,5 +171,40 @@ private:
          1.0f, -1.0f, -1.0f,
         -1.0f, -1.0f,  1.0f,
          1.0f, -1.0f,  1.0f
+    };
+};
+
+
+class LightProbe {
+public:
+    SkyBox &skybox;
+    LightProbe(SkyBox &skybox);
+
+    Shader rectangleShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/rectangle2cube.frag"} };
+    Shader irradianceShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/irradiance.frag"} };
+    Shader prefilterShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/prefilter.frag"} };
+
+    void prefilter(CubeMap& cubemap);
+    void irradiance(CubeMap& cubemap);
+    void equirectangular_to_cubemap(CubeMap& cubemap);
+
+private:
+    template <typename Callable>
+    void bake(Callable&& render);
+    void set_view(Shader& shader, size_t view, CubeMap& cubemap, GLuint mip = 0);
+
+    GLuint captureFBO;
+    GLuint captureRBO;
+    // set up projection and view matrices for capturing data onto the 6 cubemap face directions
+    // ----------------------------------------------------------------------------------------------
+    glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    glm::mat4 captureViews[6] =
+    {
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
     };
 };
