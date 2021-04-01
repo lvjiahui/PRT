@@ -374,6 +374,14 @@ GLint CubeMap::active(int unit)
     return unit;
 }
 
+void CubeMap::generateMipmap()
+{
+    mipmap = true;
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textName);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+}
+
 CubeMap::~CubeMap()
 {
     destroy();

@@ -29,12 +29,13 @@ void App::setup(Platform& plt)
  //   };
 	//cubeMap.insert({ "environment", CubeMap{faces} });
 
-	 data->hdr_RectMap = load_hdr("data/hdr/newport_loft.hdr");
-	 cubeMap.insert({"environment", CubeMap{512, 512}});
-	 lightProbe->equirectangular_to_cubemap(cubeMap["environment"]);
+	data->hdr_RectMap = load_hdr("data/hdr/newport_loft.hdr");
+	cubeMap.insert({"environment", CubeMap{512, 512}});
+	lightProbe->equirectangular_to_cubemap(cubeMap["environment"]);
+	cubeMap["environment"].generateMipmap();
 	cubeMap.insert({"irradiance", CubeMap{32, 32}});
 	lightProbe->irradiance(cubeMap["irradiance"]);
-	cubeMap.insert({"prefilter", CubeMap{128, 128, true}});
+	cubeMap.insert({"prefilter", CubeMap{256, 256, true}});
 	lightProbe->prefilter(cubeMap["prefilter"]);
 
 }

@@ -106,6 +106,7 @@ public:
     CubeMap(CubeMap&&);
     CubeMap& operator=(CubeMap&&);
     GLint active(int unit = -1);
+    void generateMipmap();
     ~CubeMap();
     int w = 0, h = 0;
     bool mipmap = false;
