@@ -282,8 +282,10 @@ void Mesh::render() {
     auto& app = App::get();
     meshShader.bind();
     glBindVertexArray(vao);
-    meshShader.uniform("environment", app.EnvMap("environment").active(0));
+    // meshShader.uniform("environment", app.EnvMap("environment").active(0));
     meshShader.uniform("irradiance", app.EnvMap("irradiance").active(1));
+    meshShader.uniform("brdfLUT", app.brdfLUT.active(2));
+    meshShader.uniform("prefilterMap", app.EnvMap("prefilter").active(3));
 
     meshShader.uniform("model", Mat_model);
     meshShader.uniform("view", app.camera.GetViewMatrix());
@@ -294,6 +296,7 @@ void Mesh::render() {
     meshShader.uniform("gamma", app.gamma);
 
     meshShader.uniform("metal", app.metal);
+    meshShader.uniform("roughness", app.roughness);
     if (app.metal)
         meshShader.uniform("F0", glm::vec3{app.F0[0],app.F0[1],app.F0[2]});
     else
@@ -301,6 +304,82 @@ void Mesh::render() {
     meshShader.uniform("albedo", glm::vec3{app.albedo[0],app.albedo[1],app.albedo[2]});
     glDrawElements(GL_TRIANGLES, n_elem, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
+}
+
+Framebuffer::Framebuffer(){
+    // setup framebuffer
+    // ----------------------
+    glGenFramebuffers(1, &framebuffer);
+    glGenRenderbuffers(1, &renderbuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+void Framebuffer::bind(){
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+}
+
+Framebuffer::~Framebuffer(){
+    glDeleteFramebuffers(1, &framebuffer);
+    glDeleteRenderbuffers(1, &renderbuffer);
+}
+
+Tex2D::Tex2D() { id = 0; }
+
+Tex2D::Tex2D(Tex2D &&src) {
+    w = src.w;
+    h = src.h;
+    id = src.id;
+    src.id = 0;
+}
+
+Tex2D::~Tex2D() {
+    if (id)
+        glDeleteTextures(1, &id);
+    id = 0;
+}
+
+void Tex2D::operator=(Tex2D &&src) {
+    if (id)
+        glDeleteTextures(1, &id);
+    w = src.w;
+    h = src.h;
+    id = src.id;
+    src.id = 0;
+}
+
+GLint Tex2D::active(int unit) const {
+    glActiveTexture(GL_TEXTURE0 + unit);
+    glBindTexture(GL_TEXTURE_2D, id);
+    return unit;
+}
+
+void Tex2D::imagei(int _w, int _h, unsigned char *img) {
+    w = _w, h = _h;
+    if (!id)
+        glGenTextures(1, &id);
+    glBindTexture(GL_TEXTURE_2D, id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
+    setup();
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Tex2D::imagef(int _w, int _h, float *img) {
+    w = _w, h = _h;
+    if (!id)
+        glGenTextures(1, &id);
+    glBindTexture(GL_TEXTURE_2D, id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, w, h, 0, GL_RGB, GL_FLOAT, img);
+    setup();
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Tex2D::setup() const {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
 
@@ -382,6 +461,7 @@ void CubeMap::generateMipmap()
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 }
 
+
 CubeMap::~CubeMap()
 {
     destroy();
@@ -391,6 +471,26 @@ void CubeMap::destroy()
     glDeleteTextures(1, &textName);
 }
 
+Quad::Quad()
+{
+    // setup plane VAO
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+}
+
+void Quad::render()
+{
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
 
 SkyBox::SkyBox()
 {
@@ -441,32 +541,7 @@ SkyBox::~SkyBox()
 }
 
 LightProbe::LightProbe(SkyBox& skybox) : skybox(skybox)
-{
-    // setup framebuffer
-    // ----------------------
-    glGenFramebuffers(1, &captureFBO);
-    glGenRenderbuffers(1, &captureRBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-
-
-template <typename Callable>
-void LightProbe::bake(Callable&& render)
-{
-    GLint m_viewport[4];
-    glGetIntegerv(GL_VIEWPORT, m_viewport);
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    for (GLuint view = 0; view < 6; ++view)
-    {
-        render(view);
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
-}
+{}
 
 void LightProbe::prefilter(CubeMap& cubemap)
 {
@@ -477,26 +552,30 @@ void LightProbe::prefilter(CubeMap& cubemap)
 
     prefilterShader.bind();
     prefilterShader.uniform("environment", App::get().EnvMap("environment").active());
-    bake([&cubemap, this](GLuint view) {
+    prefilterShader.uniform("projection", captureProjection);
+    for (GLuint view = 0; view < 6; ++view)
+    {
+        prefilterShader.uniform("view", captureViews[view]);
         unsigned int maxMipLevels = 5;
         for (unsigned int mip = 0; mip < maxMipLevels; ++mip)
         {
             float roughness = (float)mip / (float)(maxMipLevels - 1);
             prefilterShader.uniform("roughness", roughness);
-            set_view(prefilterShader, view, cubemap, mip);
-            skybox.render();
+            cubemap.render_to(skybox, view, mip);
         }
-    });
+    };
 }
 
 void LightProbe::irradiance(CubeMap& cubemap)
 {
     irradianceShader.bind();
     irradianceShader.uniform("environment", App::get().EnvMap("environment").active());
-    bake([&cubemap, this](GLuint view) {
-        this->set_view(irradianceShader, view, cubemap);
-        this->skybox.render();
-    });
+    irradianceShader.uniform("projection", captureProjection);
+    for (GLuint view = 0; view < 6; ++view)
+    {
+        irradianceShader.uniform("view", captureViews[view]);
+        cubemap.render_to(skybox, view);
+    }
 }
 
 void LightProbe::equirectangular_to_cubemap(CubeMap& cubemap)
@@ -505,20 +584,12 @@ void LightProbe::equirectangular_to_cubemap(CubeMap& cubemap)
     rectangleShader.uniform("equirectangularMap", 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, App::get().hdr_RectMap);
-    bake([&cubemap, this](GLuint view) {
-        this->set_view(rectangleShader, view, cubemap);
-        this->skybox.render();
-    });
+    rectangleShader.uniform("projection", captureProjection);
+    for (GLuint view = 0; view < 6; ++view)
+    {
+        rectangleShader.uniform("view", captureViews[view]);
+        cubemap.render_to(skybox, view);
+    }
 }
 
-void LightProbe::set_view(Shader& shader, size_t view, CubeMap& cubemap, GLuint mip)
-{
-    unsigned int mipWidth = cubemap.w * std::pow(0.5, mip);
-    unsigned int mipHeight = cubemap.h * std::pow(0.5, mip);
-    glViewport(0, 0, mipWidth, mipHeight);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + view, cubemap.textName, mip);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    shader.uniform("projection", captureProjection);
-    shader.uniform("view", captureViews[view]);
-}
+

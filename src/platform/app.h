@@ -19,8 +19,9 @@ public:
 
 	Platform& plt;
 	GLuint hdr_RectMap;
+	Tex2D brdfLUT{};
 	CubeMap& EnvMap(std::string name = {});
-
+	Framebuffer captureFB{};
 	Camera camera = Camera{ glm::vec3(0.0f, 0.0f, 3.0f) };
 	glm::mat4 Mat_projection{ 1 };
 
@@ -30,6 +31,7 @@ public:
 	float albedo[3] = {0.5f, 0.0f, 0.0f};
 	bool metal = false;
 	float lod = 0;
+	float roughness = 0;
 
 private:
 	static inline App* data = nullptr;

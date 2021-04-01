@@ -7,12 +7,15 @@ in vec3 WorldPos;
 // material parameters
 uniform vec3 albedo;
 uniform bool metal;
+uniform float roughness;
 uniform vec3 F0;
 
 uniform vec3 cameraPos;
 uniform bool tonemap;
 uniform bool gamma;
 
+uniform sampler2D brdfLUT;
+uniform samplerCube prefilterMap;
 uniform samplerCube environment;
 uniform samplerCube irradiance;
 
@@ -30,9 +33,15 @@ void main()
     vec3 R = reflect(-V, N); 
     vec3 F = fresnelSchlick(max(dot(N, V), 0.0), F0);        
 
-    vec3 color = F * texture(environment, R).rgb; //specular
-    if(!metal)
+    // sample both the pre-filter map and the BRDF lut and combine them together as per the Split-Sum approximation to get the IBL specular part.
+    const float MAX_REFLECTION_LOD = 4.0;
+    vec3 prefilteredColor = textureLod(prefilterMap, R,  roughness * MAX_REFLECTION_LOD).rgb;    
+    vec2 brdf  = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
+    vec3 color = prefilteredColor * (F * brdf.x + brdf.y); //specular
+    if(!metal){
         color += albedo/PI * (1 - F) * texture(irradiance, N).rgb; //lambertian
+
+    }
 
     if(tonemap)
         color = color / (color + vec3(1.0));

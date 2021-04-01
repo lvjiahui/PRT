@@ -96,7 +96,52 @@ private:
 
 };
 
+class Framebuffer{
+public:
+    Framebuffer();
+    Framebuffer(const Framebuffer &src) = delete;
+    void operator=(const Framebuffer &src) = delete;
+    void bind();
+    ~Framebuffer();
+private:
+    GLuint framebuffer;
+    GLuint renderbuffer;
+};
 
+class Tex2D {
+public:
+    Tex2D();
+    Tex2D(const Tex2D &src) = delete;
+    Tex2D(Tex2D &&src);
+    ~Tex2D();
+
+    void operator=(const Tex2D &src) = delete;
+    void operator=(Tex2D &&src);
+
+    void imagei(int w, int h, unsigned char *img = nullptr);
+    void imagef(int w, int h, float *img = nullptr);
+    GLuint get_id() const;
+    GLint active(int unit = 0) const;
+    template<typename Renderable>
+    void render_to(Renderable &renderable){
+        GLint m_viewport[4];
+        glGetIntegerv(GL_VIEWPORT, m_viewport);
+
+        glViewport(0, 0, w, h);
+        App::get().captureFB.bind(); //glBindFramebuffer
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w, h);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, id, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        renderable.render();
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+    }
+    int w = 0, h = 0;
+private:
+    void setup() const;
+    GLuint id;
+};
 
 class CubeMap {
 public:
@@ -106,6 +151,23 @@ public:
     CubeMap(CubeMap&&);
     CubeMap& operator=(CubeMap&&);
     GLint active(int unit = -1);
+    template<typename Renderable>
+    void render_to(Renderable& renderable, GLuint view, GLuint mip = 0) {
+        GLint m_viewport[4];
+        glGetIntegerv(GL_VIEWPORT, m_viewport);
+
+        unsigned int mipWidth = w * std::pow(0.5, mip);
+        unsigned int mipHeight = h * std::pow(0.5, mip);
+        glViewport(0, 0, mipWidth, mipHeight);
+        App::get().captureFB.bind(); //glBindFramebuffer
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + view, textName, mip);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        renderable.render();
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+    }
     void generateMipmap();
     ~CubeMap();
     int w = 0, h = 0;
@@ -117,6 +179,22 @@ private:
     void destroy();
 };
 
+
+class Quad{
+public:
+    Quad();
+    void render();
+    Shader brdfShader = Shader{ fs::path{"src/opengl/brdf.vert"}, fs::path{"src/opengl/brdf.frag"} };
+private:
+    GLuint quadVAO = 0, quadVBO;
+    float quadVertices[20] = {
+        // positions        // texture Coords
+        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+         1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+         1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+    };
+};
 
 class SkyBox {
 public:
@@ -178,24 +256,17 @@ private:
 
 class LightProbe {
 public:
-    SkyBox &skybox;
     LightProbe(SkyBox &skybox);
-
-    Shader rectangleShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/rectangle2cube.frag"} };
-    Shader irradianceShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/irradiance.frag"} };
-    Shader prefilterShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/prefilter.frag"} };
-
     void prefilter(CubeMap& cubemap);
     void irradiance(CubeMap& cubemap);
     void equirectangular_to_cubemap(CubeMap& cubemap);
 
 private:
-    template <typename Callable>
-    void bake(Callable&& render);
-    void set_view(Shader& shader, size_t view, CubeMap& cubemap, GLuint mip = 0);
+    SkyBox &skybox;
+    Shader rectangleShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/rectangle2cube.frag"} };
+    Shader irradianceShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/irradiance.frag"} };
+    Shader prefilterShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/prefilter.frag"} };
 
-    GLuint captureFBO;
-    GLuint captureRBO;
     // set up projection and view matrices for capturing data onto the 6 cubemap face directions
     // ----------------------------------------------------------------------------------------------
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
