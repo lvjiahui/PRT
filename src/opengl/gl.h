@@ -110,7 +110,7 @@ private:
 
 class Tex2D {
 public:
-    Tex2D();
+    Tex2D() = default;
     Tex2D(const Tex2D &src) = delete;
     Tex2D(Tex2D &&src);
     ~Tex2D();
@@ -140,7 +140,7 @@ public:
     int w = 0, h = 0;
 private:
     void setup() const;
-    GLuint id;
+    GLuint id = 0;
 };
 
 class CubeMap {
@@ -259,7 +259,7 @@ public:
     LightProbe(SkyBox &skybox);
     void prefilter(CubeMap& cubemap);
     void irradiance(CubeMap& cubemap);
-    void equirectangular_to_cubemap(CubeMap& cubemap);
+    void equirectangular_to_cubemap(Tex2D &rectTex, CubeMap& cubemap);
 
 private:
     SkyBox &skybox;

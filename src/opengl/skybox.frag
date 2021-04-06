@@ -7,6 +7,7 @@ uniform float lod = 0.0;
 uniform samplerCube environment;
 uniform bool tonemap;
 uniform bool gamma;
+uniform bool white_bk;
 
 void main()
 {   
@@ -16,5 +17,7 @@ void main()
         color = color / (color + vec3(1.0));
     if(gamma)
         color = pow(color, vec3(1.0/2.2)); 
+    if(white_bk)
+        color = vec3(1.0);
     FragColor = vec4(color, 1.0);
 }

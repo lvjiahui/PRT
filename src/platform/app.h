@@ -18,7 +18,7 @@ public:
 	void render();
 
 	Platform& plt;
-	GLuint hdr_RectMap;
+	Tex2D hdr_RectMap;
 	Tex2D brdfLUT{};
 	CubeMap& EnvMap(std::string name = {});
 	Framebuffer captureFB{};
@@ -27,11 +27,12 @@ public:
 
 	bool tonemap = true;
 	bool gamma = true;
+	bool white_bk = false;
 	float F0[3] = {0.562, 0.565, 0.578};
-	float albedo[3] = {0.5f, 0.0f, 0.0f};
+	float albedo[3] = {0.5f, 0.05f, 0.05f};
 	bool metal = false;
 	float lod = 0;
-	float roughness = 0;
+	float roughness = 0.2;
 
 private:
 	static inline App* data = nullptr;
@@ -45,7 +46,7 @@ private:
 	bool render_model = true;
 
 	float depth = 1;
-	const std::vector<const char*> map_choices = { "environment", "irradiance", "prefilter" };
+	const std::vector<const char*> map_choices = { "environment", "sh_env", "irradiance", "prefilter" };
 	std::map<std::string, CubeMap> _CubeMap;
     int map_current = 0;
 

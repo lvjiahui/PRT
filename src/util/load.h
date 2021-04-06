@@ -3,5 +3,5 @@
 #include <string>
 #include "opengl/gl.h"
 
-GLuint load_hdr(std::string path);
+Tex2D load_hdr(std::string path);
 

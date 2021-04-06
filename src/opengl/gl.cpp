@@ -325,7 +325,6 @@ Framebuffer::~Framebuffer(){
     glDeleteRenderbuffers(1, &renderbuffer);
 }
 
-Tex2D::Tex2D() { id = 0; }
 
 Tex2D::Tex2D(Tex2D &&src) {
     w = src.w;
@@ -373,6 +372,11 @@ void Tex2D::imagef(int _w, int _h, float *img) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, w, h, 0, GL_RGB, GL_FLOAT, img);
     setup();
     glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+GLuint Tex2D::get_id() const
+{
+    return id;
 }
 
 void Tex2D::setup() const {
@@ -519,6 +523,7 @@ void SkyBox::setShader()
     skyboxShader.uniform("tonemap", app.tonemap);
     skyboxShader.uniform("gamma", app.gamma);
     skyboxShader.uniform("lod", app.lod);
+    skyboxShader.uniform("white_bk", app.white_bk);
 }
 
 
@@ -578,12 +583,10 @@ void LightProbe::irradiance(CubeMap& cubemap)
     }
 }
 
-void LightProbe::equirectangular_to_cubemap(CubeMap& cubemap)
+void LightProbe::equirectangular_to_cubemap(Tex2D &rectTex, CubeMap& cubemap)
 {
     rectangleShader.bind();
-    rectangleShader.uniform("equirectangularMap", 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, App::get().hdr_RectMap);
+    rectangleShader.uniform("equirectangularMap", rectTex.active());
     rectangleShader.uniform("projection", captureProjection);
     for (GLuint view = 0; view < 6; ++view)
     {

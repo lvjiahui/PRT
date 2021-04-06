@@ -1,12 +1,14 @@
 #include "app.h"
 #include "platform.h"
 #include "util/load.h"
+#include "sh/image.h"
+#include "sh/spherical_harmonics.h"
 
 App::App(Platform& plt)
 	: plt(plt) {
 
 	model = std::make_unique<Model>("data/buddha.obj");
-	//model = std::make_unique<Model>("data/cube.obj");
+	//model = std::make_unique<Model>("data/sphere.obj");
 	skybox = std::make_unique<SkyBox>();
 	lightProbe = std::make_unique<LightProbe>(*skybox);
 }
@@ -29,10 +31,28 @@ void App::setup(Platform& plt)
  //   };
 	//cubeMap.insert({ "environment", CubeMap{faces} });
 
-	data->hdr_RectMap = load_hdr("data/hdr/newport_loft.hdr");
+	auto hdr = sh::HDR_Image{"data/hdr/newport_loft.hdr"};
+	// auto hdr = sh::HDR_Image{"data/hdr/Gloucester-Church_Ref.hdr"};
+
+	data->hdr_RectMap.imagef(hdr.width(), hdr.height(), hdr.pixels_);
+
+	int order = 2;
+	auto sh_coeffs = sh::ProjectEnvironment(order, hdr);
+	//auto sh_coeffs = sh::ProjectEnvironment_Par(order, hdr);
+	hdr.SetAll([&](double phi, double theta) {
+		Eigen::Vector3d normal = sh::ToVector(phi, theta);
+		Eigen::Array3f irradiance = sh::RenderDiffuseIrradiance(*sh_coeffs, normal);
+		return irradiance;
+		//return sh::EvalSHSum(order, *sh_coeffs, phi, theta);
+	});
+
+	Tex2D sh_env{};
+	sh_env.imagef(hdr.width(), hdr.height(), hdr.pixels_);
+	cubeMap.insert({"sh_env", CubeMap{512, 512}});
+	lightProbe->equirectangular_to_cubemap(sh_env, cubeMap["sh_env"]);
 
 	cubeMap.insert({"environment", CubeMap{512, 512}});
-	lightProbe->equirectangular_to_cubemap(cubeMap["environment"]);
+	lightProbe->equirectangular_to_cubemap(data->hdr_RectMap, cubeMap["environment"]);
 	cubeMap["environment"].generateMipmap();
 
 	cubeMap.insert({"irradiance", CubeMap{32, 32}});
@@ -85,10 +105,11 @@ void App::render_imgui()
 	ImGui::Checkbox("rotate", &rotate);
 	ImGui::Checkbox("tonemap", &tonemap);
 	ImGui::Checkbox("gamma", &gamma);
+	ImGui::Checkbox("white_bk", &white_bk);
 
 	ImGui::Separator();
 	ImGui::Checkbox("metal", &metal);
-	ImGui::DragFloat("roughness", &roughness, 0.01, 0, 1);
+	ImGui::SliderFloat("roughness", &roughness, 0, 1);
 	ImGui::DragFloat3("metal F0", F0, 0.01, 0, 1);
 	ImGui::DragFloat3("dielectric albedo", albedo, 0.01, 0, 1);
 	ImGui::Separator();
