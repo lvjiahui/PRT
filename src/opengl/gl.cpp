@@ -91,6 +91,10 @@ void Shader::uniform(std::string name, int count, const glm::vec2 items[]) const
     glUniform2fv(loc(name), count, (GLfloat *)items);
 }
 
+void Shader::uniform(std::string name, int count, const glm::vec3 items[]) const {
+    glUniform3fv(loc(name), count, (GLfloat *)items);
+}
+
 void Shader::uniform(std::string name, GLfloat fl) const { glUniform1f(loc(name), fl); }
 
 void Shader::uniform(std::string name, const glm::mat4 &mat) const {
@@ -220,6 +224,10 @@ void Mesh::create() {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vert), (GLvoid*)sizeof(glm::vec3));
     glEnableVertexAttribArray(1);
 
+    for (GLuint i = 0; i < 9; i++){
+        glVertexAttribPointer(i+2, 1, GL_FLOAT, GL_FALSE, sizeof(Vert), (GLvoid*)(2*sizeof(glm::vec3) + (i*sizeof(GLfloat))));
+        glEnableVertexAttribArray(i);
+    }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 
@@ -291,11 +299,15 @@ void Mesh::render() {
     meshShader.uniform("view", app.camera.GetViewMatrix());
     meshShader.uniform("projection", app.Mat_projection);
     meshShader.uniform("cameraPos", app.camera.Position);
+    meshShader.uniform("env_sh", app.env_sh.size(), app.env_sh.data());
+    meshShader.uniform("sh", app.sh);
 
     meshShader.uniform("tonemap", app.tonemap);
     meshShader.uniform("gamma", app.gamma);
 
     meshShader.uniform("metal", app.metal);
+    meshShader.uniform("diffuse", app.diffuse);
+    meshShader.uniform("specular", app.specular);
     meshShader.uniform("roughness", app.roughness);
     if (app.metal)
         meshShader.uniform("F0", glm::vec3{app.F0[0],app.F0[1],app.F0[2]});

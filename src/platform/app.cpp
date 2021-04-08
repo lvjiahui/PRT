@@ -8,17 +8,17 @@ App::App(Platform& plt)
 	: plt(plt) {
 
 	model = std::make_unique<Model>("data/buddha.obj");
-	//model = std::make_unique<Model>("data/sphere.obj");
+	//   model = std::make_unique<Model>("data/sphere.obj");
 	skybox = std::make_unique<SkyBox>();
 	lightProbe = std::make_unique<LightProbe>(*skybox);
 }
 
 void App::setup(Platform& plt)
 {
-	data = new App(plt);
+	app = new App(plt);
 
-	auto& lightProbe = data->lightProbe;
-	auto& cubeMap = data->_CubeMap;
+	auto& lightProbe = app->lightProbe;
+	auto& cubeMap = app->_CubeMap;
 
 	//std::vector<std::string> faces
  //   {
@@ -33,17 +33,23 @@ void App::setup(Platform& plt)
 
 	auto hdr = sh::HDR_Image{"data/hdr/newport_loft.hdr"};
 	// auto hdr = sh::HDR_Image{"data/hdr/Gloucester-Church_Ref.hdr"};
-
-	data->hdr_RectMap.imagef(hdr.width(), hdr.height(), hdr.pixels_);
+	// hdr.SetAll([&](double phi, double theta) {
+	// 	auto cos = sh::ToVector(phi, theta).dot(Eigen::Vector3d::UnitY());
+	// 	if(cos < 0) cos = 0;
+	// 	cos = cos*cos*cos;
+	// 	return Eigen::Array3f{cos};
+	// });
+	app->hdr_RectMap.imagef(hdr.width(), hdr.height(), hdr.pixels_);
 
 	int order = 2;
-	auto sh_coeffs = sh::ProjectEnvironment(order, hdr);
-	//auto sh_coeffs = sh::ProjectEnvironment_Par(order, hdr);
+	auto sh_coeffs = sh::ProjectEnvironment_Par(order, hdr);
+	app->env_sh.clear();
+	for(auto coeff : *sh_coeffs) app->env_sh.push_back(glm::vec3{coeff.x(),coeff.y(),coeff.z()});
 	hdr.SetAll([&](double phi, double theta) {
 		Eigen::Vector3d normal = sh::ToVector(phi, theta);
 		Eigen::Array3f irradiance = sh::RenderDiffuseIrradiance(*sh_coeffs, normal);
 		return irradiance;
-		//return sh::EvalSHSum(order, *sh_coeffs, phi, theta);
+		// return sh::EvalSHSum(order, *sh_coeffs, phi, theta);
 	});
 
 	Tex2D sh_env{};
@@ -52,7 +58,7 @@ void App::setup(Platform& plt)
 	lightProbe->equirectangular_to_cubemap(sh_env, cubeMap["sh_env"]);
 
 	cubeMap.insert({"environment", CubeMap{512, 512}});
-	lightProbe->equirectangular_to_cubemap(data->hdr_RectMap, cubeMap["environment"]);
+	lightProbe->equirectangular_to_cubemap(app->hdr_RectMap, cubeMap["environment"]);
 	cubeMap["environment"].generateMipmap();
 
 	cubeMap.insert({"irradiance", CubeMap{32, 32}});
@@ -61,16 +67,16 @@ void App::setup(Platform& plt)
 	cubeMap.insert({"prefilter", CubeMap{256, 256, true}});
 	lightProbe->prefilter(cubeMap["prefilter"]);
 
-	data->brdfLUT.imagef(512, 512);
+	app->brdfLUT.imagef(512, 512);
 	Quad quad{};
 	quad.brdfShader.bind();
-	data->brdfLUT.render_to(quad);
+	app->brdfLUT.render_to(quad);
 }
 
 App& App::get()
 {
-	assert(data);
-	return *data;
+	assert(app);
+	return *app;
 }
 
 void App::render()
@@ -102,13 +108,20 @@ void App::render_imgui()
 	ImGui::Begin("PRT");
 	ImGui::Checkbox("Imgui Demo Window", &show_demo_window);
 	ImGui::Checkbox("render model", &render_model);
+	ImGui::SameLine();
 	ImGui::Checkbox("rotate", &rotate);
 	ImGui::Checkbox("tonemap", &tonemap);
+	ImGui::SameLine();
 	ImGui::Checkbox("gamma", &gamma);
+	ImGui::SameLine();
 	ImGui::Checkbox("white_bk", &white_bk);
 
 	ImGui::Separator();
 	ImGui::Checkbox("metal", &metal);
+	ImGui::Checkbox("diffuse", &diffuse);
+	ImGui::SameLine();
+	ImGui::Checkbox("sh", &sh);
+	ImGui::Checkbox("specular", &specular);
 	ImGui::SliderFloat("roughness", &roughness, 0, 1);
 	ImGui::DragFloat3("metal F0", F0, 0.01, 0, 1);
 	ImGui::DragFloat3("dielectric albedo", albedo, 0.01, 0, 1);

@@ -6,7 +6,7 @@
 namespace sh {
 
 HDR_Image::HDR_Image(std::string path) {
-    stbi_set_flip_vertically_on_load(true);
+    //stbi_set_flip_vertically_on_load(true);
     int nrComponents;
     pixels_ = stbi_loadf(path.c_str(), &width_, &height_, &nrComponents, 0);
     assert(nrComponents == 3);

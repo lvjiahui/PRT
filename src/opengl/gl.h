@@ -40,6 +40,7 @@ public:
     void uniform(std::string name, GLfloat f) const;
     void uniform(std::string name, bool b) const;
     void uniform(std::string name, int count, const glm::vec2 items[]) const;
+    void uniform(std::string name, int count, const glm::vec3 items[]) const;
     void uniform_block(std::string name, GLuint i) const;
 
 private:
@@ -61,6 +62,7 @@ public:
     struct Vert {
         glm::vec3 pos;
         glm::vec3 norm;
+        GLfloat sh_coeff[9];
     };
     glm::mat4 Mat_model = glm::mat4(1);
 

@@ -24,18 +24,21 @@ public:
 	Framebuffer captureFB{};
 	Camera camera = Camera{ glm::vec3(0.0f, 0.0f, 3.0f) };
 	glm::mat4 Mat_projection{ 1 };
-
+	std::vector<glm::vec3> env_sh{};
 	bool tonemap = true;
 	bool gamma = true;
 	bool white_bk = false;
 	float F0[3] = {0.562, 0.565, 0.578};
 	float albedo[3] = {0.5f, 0.05f, 0.05f};
 	bool metal = false;
+	bool diffuse = true;
+	bool sh = true;
+	bool specular = true;
 	float lod = 0;
 	float roughness = 0.2;
 
 private:
-	static inline App* data = nullptr;
+	static inline App* app = nullptr;
 	App(Platform& plt);
 	void clear();
 	void render_imgui();
