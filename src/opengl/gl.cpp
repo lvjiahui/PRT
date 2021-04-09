@@ -226,7 +226,7 @@ void Mesh::create() {
 
     for (GLuint i = 0; i < 9; i++){
         glVertexAttribPointer(i+2, 1, GL_FLOAT, GL_FALSE, sizeof(Vert), (GLvoid*)(2*sizeof(glm::vec3) + (i*sizeof(GLfloat))));
-        glEnableVertexAttribArray(i);
+        glEnableVertexAttribArray(i+2);
     }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
