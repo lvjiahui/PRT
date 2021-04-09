@@ -7,7 +7,7 @@
 App::App(Platform& plt)
 	: plt(plt) {
 
-	model = std::make_unique<Model>("data/buddha.obj");
+	 model = std::make_unique<Model>("data/buddha.obj");
 	//   model = std::make_unique<Model>("data/sphere.obj");
 	skybox = std::make_unique<SkyBox>();
 	lightProbe = std::make_unique<LightProbe>(*skybox);
@@ -107,16 +107,14 @@ void App::render_imgui()
 {
 	ImGui::Begin("PRT");
 	ImGui::Checkbox("Imgui Demo Window", &show_demo_window);
-	ImGui::Checkbox("render model", &render_model);
-	ImGui::SameLine();
-	ImGui::Checkbox("rotate", &rotate);
 	ImGui::Checkbox("tonemap", &tonemap);
 	ImGui::SameLine();
 	ImGui::Checkbox("gamma", &gamma);
-	ImGui::SameLine();
-	ImGui::Checkbox("white_bk", &white_bk);
 
 	ImGui::Separator();
+	ImGui::Checkbox("render model", &render_model);
+	ImGui::SameLine();
+	ImGui::Checkbox("rotate model", &rotate_model);
 	ImGui::Checkbox("metal", &metal);
 	ImGui::Checkbox("diffuse", &diffuse);
 	ImGui::SameLine();
@@ -128,6 +126,9 @@ void App::render_imgui()
 	ImGui::Separator();
 
 
+	ImGui::Checkbox("rotate env", &rotate_env);
+	ImGui::SameLine();
+	ImGui::Checkbox("white_bk", &white_bk);
 	ImGui::DragFloat("lod", &lod, 0.01, 0, 4);
     ImGui::ListBox("skybox", &map_current, map_choices.data(), map_choices.size());
 
@@ -143,13 +144,15 @@ void App::render_3d()
 
 	Mat_projection = glm::perspective(glm::radians(camera.Zoom), (float)plt.SCR_WIDTH / (float)plt.SCR_HEIGHT, 0.1f, 100.f);
 
-	if (model && render_model) {
-		if (rotate)
-			model->Mat_model = glm::rotate(model->Mat_model, (float)ImGui::GetIO().DeltaTime, glm::vec3(0.5f, 1.0f, 0.0f));
-		model->render();
-	}
-	if (skybox) {
+	if (skybox) { //rotate env first, then render model
+		if (rotate_env)
+			skybox->Mat_rotate = glm::rotate(skybox->Mat_rotate, (float)(1 * ImGui::GetIO().DeltaTime), glm::vec3(0.0f, 1.0f, 0.0f));
 		skybox->setShader();
 		skybox->render();
+	}
+	if (model && render_model) {
+		if (rotate_model)
+			model->Mat_model = glm::rotate(model->Mat_model, (float)ImGui::GetIO().DeltaTime, glm::vec3(0.5f, 1.0f, 0.0f));
+		model->render();
 	}
 }

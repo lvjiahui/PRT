@@ -301,6 +301,7 @@ void Mesh::render() {
     meshShader.uniform("cameraPos", app.camera.Position);
     meshShader.uniform("env_sh", app.env_sh.size(), app.env_sh.data());
     meshShader.uniform("sh", app.sh);
+    meshShader.uniform("envRotate", glm::transpose(app.skybox->Mat_rotate));
 
     meshShader.uniform("tonemap", app.tonemap);
     meshShader.uniform("gamma", app.gamma);
@@ -536,6 +537,7 @@ void SkyBox::setShader()
     skyboxShader.uniform("gamma", app.gamma);
     skyboxShader.uniform("lod", app.lod);
     skyboxShader.uniform("white_bk", app.white_bk);
+    skyboxShader.uniform("envRotate", glm::transpose(Mat_rotate));
 }
 
 

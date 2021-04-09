@@ -206,6 +206,7 @@ public:
     void setShader();
     void render();
     ~SkyBox();
+    glm::mat4 Mat_rotate = glm::mat4(1);
 private:
     GLuint skyboxVAO = 0, skyboxVBO;
 

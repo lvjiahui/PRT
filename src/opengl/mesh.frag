@@ -11,6 +11,7 @@ uniform bool metal;
 uniform float roughness;
 uniform vec3 F0;
 
+uniform mat4 envRotate;
 uniform vec3 cameraPos;
 uniform bool tonemap;
 uniform bool gamma;
@@ -42,7 +43,7 @@ void main()
     if (specular){
         // sample both the pre-filter map and the BRDF lut and combine them together as per the Split-Sum approximation to get the IBL  specular part.
         const float MAX_REFLECTION_LOD = 4.0;
-        vec3 prefilteredColor = textureLod(prefilterMap, R,  roughness * MAX_REFLECTION_LOD).rgb;    
+        vec3 prefilteredColor = textureLod(prefilterMap, vec3(envRotate*vec4(R, 1.0)),  roughness * MAX_REFLECTION_LOD).rgb;    
         vec2 brdf  = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
         specular_color = prefilteredColor * (F * brdf.x + brdf.y); //specular
     }
@@ -50,7 +51,7 @@ void main()
         if(sh)
             diffuse_color = albedo/PI * Sh_color;
         else
-            diffuse_color = albedo/PI * texture(irradiance, N).rgb; //lambertian
+            diffuse_color = albedo/PI * texture(irradiance, vec3(envRotate*vec4(N, 1.0))).rgb; //lambertian
     }
     if(specular && diffuse)
         color = specular_color + (1-F)*diffuse_color;

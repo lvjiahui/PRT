@@ -32,10 +32,11 @@ public:
 	float albedo[3] = {0.5f, 0.05f, 0.05f};
 	bool metal = false;
 	bool diffuse = true;
-	bool sh = true;
+	bool sh = false;
 	bool specular = true;
 	float lod = 0;
 	float roughness = 0.2;
+	std::unique_ptr<SkyBox> skybox;
 
 private:
 	static inline App* app = nullptr;
@@ -45,7 +46,8 @@ private:
 	void render_3d();
 
 	bool show_demo_window = false;
-	bool rotate = false;
+	bool rotate_model = false;
+	bool rotate_env = false;
 	bool render_model = true;
 
 	float depth = 1;
@@ -55,6 +57,5 @@ private:
 
 	ImVec4 clear_color = ImVec4(0.2f, 0.3f, 0.3f, 1.00f);
 	std::unique_ptr<Model> model;
-	std::unique_ptr<SkyBox> skybox;
 	std::unique_ptr<LightProbe> lightProbe;
 };
