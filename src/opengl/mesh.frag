@@ -60,6 +60,7 @@ void main()
     else if(diffuse)
         color = diffuse_color;
 
+    color = max(color, vec3(0));
     if(tonemap)
         color = color / (color + vec3(1.0));
     if(gamma)

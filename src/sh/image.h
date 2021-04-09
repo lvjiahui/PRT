@@ -22,7 +22,7 @@
 #include <memory>
 #include <functional>
 
-#include "Eigen/Dense"
+#include <Eigen/Dense>
 
 namespace sh {
 

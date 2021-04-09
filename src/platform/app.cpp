@@ -1,13 +1,13 @@
 #include "app.h"
 #include "platform.h"
-#include "util/load.h"
+#include "util/util.h"
 #include "sh/image.h"
 #include "sh/spherical_harmonics.h"
 
 App::App(Platform& plt)
 	: plt(plt) {
 
-	 model = std::make_unique<Model>("data/buddha.obj");
+	model = std::make_unique<Model>("data/buddha.obj");
 	//   model = std::make_unique<Model>("data/sphere.obj");
 	skybox = std::make_unique<SkyBox>();
 	lightProbe = std::make_unique<LightProbe>(*skybox);
@@ -32,7 +32,7 @@ void App::setup(Platform& plt)
 	//cubeMap.insert({ "environment", CubeMap{faces} });
 
 	auto hdr = sh::HDR_Image{"data/hdr/newport_loft.hdr"};
-	// auto hdr = sh::HDR_Image{"data/hdr/Gloucester-Church_Ref.hdr"};
+	 // auto hdr = sh::HDR_Image{"data/hdr/Gloucester-Church_Ref.hdr"};
 	// hdr.SetAll([&](double phi, double theta) {
 	// 	auto cos = sh::ToVector(phi, theta).dot(Eigen::Vector3d::UnitY());
 	// 	if(cos < 0) cos = 0;
@@ -143,16 +143,17 @@ void App::render_3d()
 {
 
 	Mat_projection = glm::perspective(glm::radians(camera.Zoom), (float)plt.SCR_WIDTH / (float)plt.SCR_HEIGHT, 0.1f, 100.f);
-
-	if (skybox) { //rotate env first, then render model
-		if (rotate_env)
-			skybox->Mat_rotate = glm::rotate(skybox->Mat_rotate, (float)(1 * ImGui::GetIO().DeltaTime), glm::vec3(0.0f, 1.0f, 0.0f));
+		
+	if (skybox && rotate_env) //rotate env first, then render model
+		skybox->Mat_rotate = glm::rotate(skybox->Mat_rotate, (float)(1 * ImGui::GetIO().DeltaTime), glm::vec3(0.0f, 1.0f, 0.0f));
+	if (model && rotate_model)
+		model->Mat_model = glm::rotate(model->Mat_model, (float)ImGui::GetIO().DeltaTime, glm::vec3(0.5f, 1.0f, 0.0f));
+	
+	if (skybox) {
 		skybox->setShader();
 		skybox->render();
 	}
 	if (model && render_model) {
-		if (rotate_model)
-			model->Mat_model = glm::rotate(model->Mat_model, (float)ImGui::GetIO().DeltaTime, glm::vec3(0.5f, 1.0f, 0.0f));
 		model->render();
 	}
 }

@@ -1,6 +1,7 @@
 #include "opengl/gl.h"
 #include "platform/app.h"
 #include "util/log.h"
+#include "util/util.h"
 #include <fstream>
 #include <sf_libs/stb_image.h>
 
@@ -299,7 +300,9 @@ void Mesh::render() {
     meshShader.uniform("view", app.camera.GetViewMatrix());
     meshShader.uniform("projection", app.Mat_projection);
     meshShader.uniform("cameraPos", app.camera.Position);
-    meshShader.uniform("env_sh", app.env_sh.size(), app.env_sh.data());
+    auto Mat_rotate = glm::mat4(glm::mat3(Mat_model));
+    auto sh = rotate_sh(app.env_sh, glm::transpose(Mat_rotate) * app.skybox->Mat_rotate);
+    meshShader.uniform("env_sh", sh.size(), sh.data());
     meshShader.uniform("sh", app.sh);
     meshShader.uniform("envRotate", glm::transpose(app.skybox->Mat_rotate));
 

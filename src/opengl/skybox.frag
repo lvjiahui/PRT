@@ -14,6 +14,7 @@ void main()
 {   
     // vec3 color = texture(environment, CubeTexPos).rgb;
     vec3 color = textureLod(environment, vec3(envRotate*vec4(CubeTexPos, 1.0)), lod).rgb;
+    color = max(color, vec3(0));
     if(tonemap)
         color = color / (color + vec3(1.0));
     if(gamma)
