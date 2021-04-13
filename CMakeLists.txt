@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(PRT LANGUAGES CXX)
 
 find_package(Eigen3 CONFIG REQUIRED)
+FIND_PACKAGE(embree 3.0 REQUIRED)
 add_subdirectory("deps/imgui/")
 add_subdirectory("deps/nfd/")
 add_subdirectory("deps/fmt-7.1.3/")
@@ -18,6 +19,7 @@ FILE ( GLOB PRT_SOURCES
     src/util/*
     src/scene/*
     src/sh/*
+    src/raytracing/*
     src/main.cpp
     ) 
 add_executable(PRT ${PRT_SOURCES})
@@ -30,7 +32,7 @@ target_compile_options(PRT PRIVATE /W4 /wd4201 /wd4840 /wd4100 /fp:fast /MP )
 
 
 target_link_libraries(PRT 
-    PRIVATE imgui nfd fmt::fmt assimp sf_libs  Eigen3::Eigen
+    PRIVATE imgui nfd fmt::fmt assimp sf_libs  Eigen3::Eigen embree
 )
 
 target_include_directories(PRT 

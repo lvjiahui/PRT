@@ -7,19 +7,32 @@
 #include "opengl/gl.h"
 #include "util/camera.h"
 #include "scene/model.h"
+class RTScene;
 
 class Platform;
 
 class App {
 public:
+	struct Pixel{
+		unsigned char r,g,b,a;
+	};
+	struct Pixel_accum{
+		glm::vec3 color;
+		float count;
+	};
+
 	static void setup(Platform& plt);
 	static App& get();
 
 	void render();
 
 	Platform& plt;
-	Tex2D hdr_RectMap;
+	Tex2D hdr_RectMap{};
 	Tex2D brdfLUT{};
+    Tex2D screenTex{};
+	std::vector<Pixel> pixels;
+	std::vector<Pixel_accum> pixels_w;
+	Quad screen_quad{};
 	CubeMap& EnvMap(std::string name = {});
 	Framebuffer captureFB{};
 	Camera camera = Camera{ glm::vec3(0.0f, 0.0f, 3.0f) };
@@ -38,6 +51,8 @@ public:
 	float roughness = 0.2;
 	std::unique_ptr<SkyBox> skybox;
 
+	int max_path_length = 2;
+
 private:
 	static inline App* app = nullptr;
 	App(Platform& plt);
@@ -46,6 +61,7 @@ private:
 	void render_3d();
 
 	bool show_demo_window = false;
+	bool ray_tracing = false;
 	bool rotate_model = false;
 	bool rotate_env = false;
 	bool render_model = true;
@@ -58,4 +74,5 @@ private:
 	ImVec4 clear_color = ImVec4(0.2f, 0.3f, 0.3f, 1.00f);
 	std::unique_ptr<Model> model;
 	std::unique_ptr<LightProbe> lightProbe;
+	std::unique_ptr<RTScene> rtscene;
 };

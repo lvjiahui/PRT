@@ -60,6 +60,12 @@ void Platform::framebuffer_size_callback(GLFWwindow *window, int width, int heig
 {
 	// make sure the viewport matches the new window dimensions; note that width and
 	// height will be significantly larger than specified on retina displays.
+	auto *app = (App *)glfwGetWindowUserPointer(window);
+	app->plt.SCR_WIDTH = width;
+	app->plt.SCR_HEIGHT = height;
+	app->pixels.resize(width*height);
+	app->pixels_w.resize(width*height);
+	app->camera.dirty = true;
 	glViewport(0, 0, width, height);
 }
 

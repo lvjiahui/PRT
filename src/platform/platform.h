@@ -30,8 +30,8 @@ public:
 	~Platform();
 
 	void loop(App& app);
-	const unsigned int SCR_WIDTH = 1280;
-	const unsigned int SCR_HEIGHT = 720;
+	unsigned int SCR_WIDTH = 1280;
+	unsigned int SCR_HEIGHT = 720;
 
 private:
 	void platform_shutdown();

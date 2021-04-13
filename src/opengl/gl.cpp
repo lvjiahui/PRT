@@ -7,7 +7,8 @@
 
 
 namespace Shaders {
-
+    Shader brdfShader;
+    Shader screenShader;
 
 }
 

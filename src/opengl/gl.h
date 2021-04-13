@@ -14,7 +14,10 @@
 
 namespace fs = std::filesystem;
 
+class Shader;
 namespace Shaders {
+    extern Shader brdfShader;
+    extern Shader screenShader;
 
 } // namespace Shaders
 
@@ -186,7 +189,6 @@ class Quad{
 public:
     Quad();
     void render();
-    Shader brdfShader = Shader{ fs::path{"src/opengl/brdf.vert"}, fs::path{"src/opengl/brdf.frag"} };
 private:
     GLuint quadVAO = 0, quadVBO;
     float quadVertices[20] = {

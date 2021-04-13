@@ -3,19 +3,25 @@
 #include "util/util.h"
 #include "sh/image.h"
 #include "sh/spherical_harmonics.h"
+#include "raytracing/raytracing.h"
 
 App::App(Platform& plt)
 	: plt(plt) {
-
-	model = std::make_unique<Model>("data/buddha.obj");
-	//   model = std::make_unique<Model>("data/sphere.obj");
-	skybox = std::make_unique<SkyBox>();
-	lightProbe = std::make_unique<LightProbe>(*skybox);
+		pixels.resize(plt.SCR_WIDTH * plt.SCR_HEIGHT);
+		pixels_w.resize(plt.SCR_WIDTH * plt.SCR_HEIGHT);
+		model = std::make_unique<Model>("data/buddha.obj");
+		//  model = std::make_unique<Model>("data/sphere.obj");
+		skybox = std::make_unique<SkyBox>();
+		lightProbe = std::make_unique<LightProbe>(*skybox);
+		rtscene = std::make_unique<RTScene>(model->meshes[0]);
 }
 
 void App::setup(Platform& plt)
 {
 	app = new App(plt);
+
+    Shaders::brdfShader = Shader{ fs::path{"src/opengl/brdf.vert"}, fs::path{"src/opengl/brdf.frag"} };
+    Shaders::screenShader = Shader{ fs::path{"src/opengl/screen.vert"}, fs::path{"src/opengl/screen.frag"} };
 
 	auto& lightProbe = app->lightProbe;
 	auto& cubeMap = app->_CubeMap;
@@ -68,9 +74,9 @@ void App::setup(Platform& plt)
 	lightProbe->prefilter(cubeMap["prefilter"]);
 
 	app->brdfLUT.imagef(512, 512);
-	Quad quad{};
-	quad.brdfShader.bind();
-	app->brdfLUT.render_to(quad);
+	Shaders::brdfShader.bind();
+	app->brdfLUT.render_to(app->screen_quad);
+
 }
 
 App& App::get()
@@ -107,6 +113,9 @@ void App::render_imgui()
 {
 	ImGui::Begin("PRT");
 	ImGui::Checkbox("Imgui Demo Window", &show_demo_window);
+	ImGui::Checkbox("ray tracing", &ray_tracing);
+	if(ImGui::DragInt("max path length", &max_path_length, 0.1, 1, 20))
+		camera.dirty = true;
 	ImGui::Checkbox("tonemap", &tonemap);
 	ImGui::SameLine();
 	ImGui::Checkbox("gamma", &gamma);
@@ -141,6 +150,16 @@ void App::render_imgui()
 
 void App::render_3d()
 {
+	if(ray_tracing && rtscene){
+		raytrace(*rtscene);
+    	/* draw text to screen */
+		//screenTex.imagef(plt.SCR_WIDTH, plt.SCR_HEIGHT, (float*)pixels.data());
+		screenTex.imagei(plt.SCR_WIDTH, plt.SCR_HEIGHT, (unsigned char *)pixels.data());
+		Shaders::screenShader.bind();
+		Shaders::screenShader.uniform("screenTexture", screenTex.active());
+		screen_quad.render();
+		return;
+	}
 
 	Mat_projection = glm::perspective(glm::radians(camera.Zoom), (float)plt.SCR_WIDTH / (float)plt.SCR_HEIGHT, 0.1f, 100.f);
 		
