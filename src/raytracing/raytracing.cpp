@@ -198,6 +198,7 @@ glm::vec3 renderAO(RTCScene scene, glm::vec3 pos, glm::vec3 dir) {
 		normal = glm::normalize(normal);
 		pos += rayhit.ray.tfar * dir;
 		auto [wi, pdf] = cosineSampleHemisphere(random(), random(), normal);
+		dir = wi;
 		if (pdf <= 1E-4f /* 0.0f */) break;
 		// Lw *= glm::clamp(glm::dot(wi, normal), 0.f, 1.f) / (pdf * PI);
 		Lw *= glm::vec3{ app.albedo[0], app.albedo[1], app.albedo[2] };
