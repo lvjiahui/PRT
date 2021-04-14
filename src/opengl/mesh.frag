@@ -49,7 +49,7 @@ void main()
     }
     if(diffuse && !metal){
         if(sh)
-            diffuse_color = albedo/PI * Sh_color;
+            diffuse_color = albedo * Sh_color; //sh contains 1/PI
         else
             diffuse_color = albedo/PI * texture(irradiance, vec3(envRotate*vec4(N, 1.0))).rgb; //lambertian
     }

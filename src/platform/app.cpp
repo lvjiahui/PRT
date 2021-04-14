@@ -114,8 +114,10 @@ void App::render_imgui()
 	ImGui::Begin("PRT");
 	ImGui::Checkbox("Imgui Demo Window", &show_demo_window);
 	ImGui::Checkbox("ray tracing", &ray_tracing);
-	if(ImGui::DragInt("max path length", &max_path_length, 0.1, 1, 20))
+	if(ImGui::SliderInt("max path length", &max_path_length, 1, 10))
 		camera.dirty = true;
+	if(ImGui::Button("bake SH"))
+		bake_SH(model->meshes[0]);
 	ImGui::Checkbox("tonemap", &tonemap);
 	ImGui::SameLine();
 	ImGui::Checkbox("gamma", &gamma);
@@ -138,7 +140,7 @@ void App::render_imgui()
 	ImGui::Checkbox("rotate env", &rotate_env);
 	ImGui::SameLine();
 	ImGui::Checkbox("white_bk", &white_bk);
-	ImGui::DragFloat("lod", &lod, 0.01, 0, 4);
+	ImGui::SliderFloat("lod", &lod, 0, 4);
     ImGui::ListBox("skybox", &map_current, map_choices.data(), map_choices.size());
 
 	if (show_demo_window)

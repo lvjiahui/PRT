@@ -2,7 +2,6 @@
 #include <embree3/rtcore.h>
 #include "opengl/gl.h"
 
-extern RTCDevice device;
 
 class RTScene{
 public:
@@ -13,3 +12,5 @@ private:
 };
 
 void raytrace(const RTScene& rtscene);
+void bake_AO(Mesh& gl_mesh);
+void bake_SH(Mesh& gl_mesh);
