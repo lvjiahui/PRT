@@ -113,16 +113,21 @@ void App::render_imgui()
 {
 	ImGui::Begin("PRT");
 	ImGui::Checkbox("Imgui Demo Window", &show_demo_window);
-	ImGui::Checkbox("ray tracing", &ray_tracing);
-	if(ImGui::SliderInt("max path length", &max_path_length, 1, 10))
-		camera.dirty = true;
-	if(ImGui::Button("bake SH"))
-		bake_SH(model->meshes[0]);
 	ImGui::Checkbox("tonemap", &tonemap);
 	ImGui::SameLine();
 	ImGui::Checkbox("gamma", &gamma);
 
 	ImGui::Separator();
+
+	ImGui::Checkbox("ray tracing", &ray_tracing);
+	if(ImGui::SliderInt("max path length", &max_path_length, 1, 10))
+		camera.dirty = true;
+	if(ImGui::Button("bake SH"))
+		bake_SH(model->meshes[0]);
+	ImGui::SliderInt("bake resolution", &sh_resolution, 10, 100);
+
+	ImGui::Separator();
+
 	ImGui::Checkbox("render model", &render_model);
 	ImGui::SameLine();
 	ImGui::Checkbox("rotate model", &rotate_model);
@@ -134,6 +139,7 @@ void App::render_imgui()
 	ImGui::SliderFloat("roughness", &roughness, 0, 1);
 	ImGui::DragFloat3("metal F0", F0, 0.01, 0, 1);
 	ImGui::DragFloat3("dielectric albedo", albedo, 0.01, 0, 1);
+	
 	ImGui::Separator();
 
 

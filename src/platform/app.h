@@ -52,6 +52,7 @@ public:
 	std::unique_ptr<SkyBox> skybox;
 
 	int max_path_length = 2;
+	int sh_resolution = 32;
 
 private:
 	static inline App* app = nullptr;

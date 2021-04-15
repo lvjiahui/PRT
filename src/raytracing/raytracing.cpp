@@ -350,7 +350,6 @@ void bake_AO(Mesh &gl_mesh)
 				  });
 }
 
-int num_sample = 30;
 int order = 2;
 void bake_SH(Mesh &gl_mesh)
 {
@@ -366,11 +365,11 @@ void bake_SH(Mesh &gl_mesh)
 			for (int l = 0; l <= order; l++) {
 				for (int m = -l; m <= l; m++) {
 					vert.sh_coeff[sh::GetIndex(l, m)] = 0;
-					for (int i = 0; i < num_sample; i++)
-						for (int j = 0; j < num_sample; j++)
+					for (int i = 0; i < app.sh_resolution; i++)
+						for (int j = 0; j < app.sh_resolution; j++)
 						{
-							float x = (i+random())/num_sample;
-							float y = (j+random())/num_sample;
+							float x = (i+random()) / app.sh_resolution;
+							float y = (j+random()) / app.sh_resolution;
 							auto [wi, pdf] = cosineSampleHemisphere(x, y, vert.norm);
 							auto L = renderSH(
 								rtscene.scene,
@@ -381,7 +380,7 @@ void bake_SH(Mesh &gl_mesh)
 								albedo);
 							vert.sh_coeff[sh::GetIndex(l, m)] += L.x;
 						}
-					vert.sh_coeff[sh::GetIndex(l, m)] /= num_sample*num_sample;
+					vert.sh_coeff[sh::GetIndex(l, m)] /= app.sh_resolution * app.sh_resolution;
 				}
 			}
 
