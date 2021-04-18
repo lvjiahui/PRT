@@ -12,8 +12,8 @@
 
 
 inline float random() {
-	static std::uniform_real_distribution<float> distribution(0.0, 1.0);
-	static std::mt19937 generator;
+	thread_local static std::uniform_real_distribution<float> distribution(0.0, 1.0);
+	thread_local static std::mt19937 generator;
 	return distribution(generator);
 }
 
@@ -179,7 +179,6 @@ glm::vec3 renderAO(RTCScene scene,
 				   int depth,
 				   const glm::vec3 &albedo = glm::vec3{0})
 {
-	auto& app = App::get();
 	float eps = 1e-5;
 	/* radiance accumulator and weight */
 	glm::vec3 L(0.0f);
@@ -233,7 +232,6 @@ glm::vec3 renderSH(RTCScene scene,
 				   int l, int m,
 				   const glm::vec3 &albedo = glm::vec3{0})
 {
-	auto &app = App::get();
 	float eps = 1e-5;
 	/* radiance accumulator and weight */
 	glm::vec3 L(0.0f);
@@ -318,37 +316,6 @@ void raytrace(const RTScene& rtscene) {
 				  });
 }
 
-int num_ray = 1e4;
-glm::vec3 white{1};
-void bake_AO(Mesh &gl_mesh)
-{
-
-	RTScene rtscene{gl_mesh};
-	auto &verts = gl_mesh.edit_verts();
-	std::mutex progress_mutex;
-	int done = 0, All = verts.size();
-	std::for_each(std::execution::par, verts.begin(), verts.end(),
-				  [&](Mesh::Vert &vert) {
-					  auto &app = App::get();
-					  vert.sh_coeff[0] = 0;
-					  for (int i = 0; i < num_ray; i++)
-					  {
-						  auto [wi, pdf] = cosineSampleHemisphere(random(), random(), vert.norm);
-						  auto L = renderAO(
-							  rtscene.scene,
-							  vert.pos + (float)1e-4 * vert.norm,
-							  wi,
-							  app.max_path_length - 1,
-							  white);
-						  vert.sh_coeff[0] += L.x;
-					  }
-					  vert.sh_coeff[0] /= num_ray;
-
-					  std::lock_guard<std::mutex> guard(progress_mutex);
-					  done++;
-					  fmt::print("\r baking... {}/{}", done, All);
-				  });
-}
 
 int order = 2;
 void bake_SH(Mesh &gl_mesh)

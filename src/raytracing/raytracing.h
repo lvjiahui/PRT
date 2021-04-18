@@ -12,5 +12,4 @@ private:
 };
 
 void raytrace(const RTScene& rtscene);
-void bake_AO(Mesh& gl_mesh);
 void bake_SH(Mesh& gl_mesh);
