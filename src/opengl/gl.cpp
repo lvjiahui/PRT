@@ -3,6 +3,7 @@
 #include "util/log.h"
 #include "util/util.h"
 #include <fstream>
+#include <sstream>
 #include <sf_libs/stb_image.h>
 
 
@@ -31,7 +32,7 @@ Shader::Shader(fs::path vertex_path, fs::path fragmentPath)
         // open files
         vShaderFile.open(vertex_path);
         fShaderFile.open(fragmentPath);
-        std::stringstream vShaderStream, fShaderStream;
+        std::stringstream vShaderStream{}, fShaderStream{};
         // read file's buffer contents into streams
         vShaderStream << vShaderFile.rdbuf();
         fShaderStream << fShaderFile.rdbuf();

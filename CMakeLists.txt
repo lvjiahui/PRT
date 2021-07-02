@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(PRT LANGUAGES CXX)
 
-find_package(Eigen3 CONFIG REQUIRED)
+# find_package(Eigen3 REQUIRED NO_MODULE)
+INCLUDE_DIRECTORIES("deps/Eigen/")
 FIND_PACKAGE(embree 3.0 REQUIRED)
 add_subdirectory("deps/imgui/")
 add_subdirectory("deps/nfd/")
@@ -32,9 +33,11 @@ target_compile_options(PRT PRIVATE /W4 /wd4201 /wd4840 /wd4100 /fp:fast /MP )
 
 
 target_link_libraries(PRT 
-    PRIVATE imgui nfd fmt::fmt assimp sf_libs  Eigen3::Eigen embree
+    PRIVATE imgui nfd fmt::fmt assimp sf_libs  embree
 )
-
+# target_link_libraries(PRT 
+#     PRIVATE Eigen3::Eigen
+# )
 target_include_directories(PRT 
     PRIVATE "deps/" "deps/assimp/include"
     PRIVATE "src/"
