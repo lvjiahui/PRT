@@ -15,10 +15,11 @@
 namespace fs = std::filesystem;
 
 class Shader;
+class ComputeShader;
 namespace Shaders {
     extern Shader brdfShader;
     extern Shader screenShader;
-
+    extern ComputeShader compShader;
 } // namespace Shaders
 
 class Shader {
@@ -57,6 +58,24 @@ private:
     void destroy();
 };
 
+class ComputeShader {
+public:
+    ComputeShader() {};
+    explicit ComputeShader(fs::path shader_path);
+    ComputeShader(const ComputeShader &src) = delete;
+    void operator=(ComputeShader&& src);
+    void operator=(const ComputeShader &src) = delete;
+    void bind() const;
+    ~ComputeShader();
+    void uniform(std::string name, GLint i) const;
+    GLuint program_id() { return program; };
+private:
+    GLuint loc(std::string name) const;
+    static bool validate(GLuint program, std::string code={});
+    void destroy();
+    GLuint shader = 0;
+    GLuint program = 0;
+};
 
 class Mesh {
 public:
@@ -123,8 +142,8 @@ public:
     void operator=(const Tex2D &src) = delete;
     void operator=(Tex2D &&src);
 
-    void imagei(int w, int h, unsigned char *img = nullptr);
-    void imagef(int w, int h, float *img = nullptr);
+    void imagei(int w, int h, unsigned char *img = nullptr); //source:rgba
+    void imagef(int w, int h, float *img = nullptr); //source:rgb
     GLuint get_id() const;
     GLint active(int unit = 0) const;
     template<typename Renderable>

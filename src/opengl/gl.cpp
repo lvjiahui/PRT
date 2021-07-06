@@ -10,7 +10,7 @@
 namespace Shaders {
     Shader brdfShader;
     Shader screenShader;
-
+    ComputeShader compShader;
 }
 
 Shader::Shader() {}
@@ -166,8 +166,107 @@ bool Shader::validate(GLuint program, std::string code) {
     return true;
 }
 
+ComputeShader::ComputeShader(fs::path shader_path) {
+    std::string shaderCode;
+    std::ifstream ShaderFile;
+    // ensure ifstream objects can throw exceptions:
+    ShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+    try
+    {
+        ShaderFile.open(shader_path);
+        std::stringstream ShaderStream{};
+        ShaderStream << ShaderFile.rdbuf();
+        ShaderFile.close();
+
+        // convert stream into string
+        shaderCode = ShaderStream.str();
+    }
+    catch (std::ifstream::failure& e)
+    {
+        fmt::print("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
+    }
+
+    shader = glCreateShader(GL_COMPUTE_SHADER);
+    const GLchar *c = shaderCode.c_str();
+    glShaderSource(shader, 1, &c, NULL);
+    glCompileShader(shader);
 
 
+    if (!validate(shader, c)) {
+        destroy();
+        return;
+    }
+
+
+    program = glCreateProgram();
+    glAttachShader(program, shader);
+    glLinkProgram(program);
+
+    GLint linked = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &linked);
+    if (linked == GL_FALSE) {
+
+        GLint len = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
+
+        GLchar *msg = new GLchar[len];
+        glGetProgramInfoLog(program, len, &len, msg);
+
+        warn("Shader %d failed to link: %s \n %s", program, msg, c);
+        delete[] msg;
+
+        destroy();
+        return;
+    }
+
+}
+
+void ComputeShader::operator=(ComputeShader &&src) {
+    program = src.program;
+    src.program = 0;
+    shader = src.shader;
+    src.shader = 0;
+}
+
+void ComputeShader::uniform(std::string name, GLint i) const { glUniform1i(loc(name), i); }
+
+GLuint ComputeShader::loc(std::string name) const { 
+    auto location = glGetUniformLocation(program, name.c_str());
+    assert(location!=-1);
+    return location; 
+}
+
+ComputeShader::~ComputeShader() { destroy(); }
+
+void ComputeShader::bind() const { glUseProgram(program); }
+
+void ComputeShader::destroy() {
+    glUseProgram(0);
+    glDeleteShader(shader);
+    glDeleteProgram(program);
+    shader = program = 0;
+}
+
+bool ComputeShader::validate(GLuint program, std::string code) {
+
+    GLint compiled = 0;
+    glGetShaderiv(program, GL_COMPILE_STATUS, &compiled);
+    if (compiled == GL_FALSE) {
+
+        GLint len = 0;
+        glGetShaderiv(program, GL_INFO_LOG_LENGTH, &len);
+
+        GLchar *msg = new GLchar[len];
+        glGetShaderInfoLog(program, len, &len, msg);
+
+        warn("Shader %d failed to compile: %s \n %s", program, msg, code.c_str());
+        delete[] msg;
+
+        return false;
+    }
+    return true;
+}
 
 Mesh::Mesh() { create(); }
 
@@ -302,9 +401,9 @@ void Mesh::render() {
     meshShader.uniform("view", app.camera.GetViewMatrix());
     meshShader.uniform("projection", app.Mat_projection);
     meshShader.uniform("cameraPos", app.camera.Position);
-    auto Mat_rotate = glm::mat4(glm::mat3(Mat_model));
-    auto sh = rotate_sh(app.env_sh, glm::transpose(Mat_rotate) * app.skybox->Mat_rotate);
-    meshShader.uniform("env_sh", sh.size(), sh.data());
+    // auto Mat_rotate = glm::mat4(glm::mat3(Mat_model));
+    // auto sh = rotate_sh(app.env_sh, glm::transpose(Mat_rotate) * app.skybox->Mat_rotate);
+    meshShader.uniform("env_sh", app.env_sh.size(), app.env_sh.data());
     meshShader.uniform("sh", app.sh);
     meshShader.uniform("envRotate", glm::transpose(app.skybox->Mat_rotate));
 
@@ -387,7 +486,7 @@ void Tex2D::imagef(int _w, int _h, float *img) {
     if (!id)
         glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, w, h, 0, GL_RGB, GL_FLOAT, img);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGB, GL_FLOAT, img);
     setup();
     glBindTexture(GL_TEXTURE_2D, 0);
 }

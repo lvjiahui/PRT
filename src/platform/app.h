@@ -27,6 +27,7 @@ public:
 	void render();
 
 	Platform& plt;
+	GLuint SH_tex;
 	Tex2D hdr_RectMap{};
 	Tex2D brdfLUT{};
     Tex2D screenTex{};
