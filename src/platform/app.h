@@ -7,6 +7,7 @@
 #include "opengl/gl.h"
 #include "util/camera.h"
 #include "scene/model.h"
+#include "sh/volume.h"
 class RTScene;
 
 class Platform;
@@ -27,7 +28,7 @@ public:
 	void render();
 
 	Platform& plt;
-	GLuint SH_tex;
+	SH_volume sh_volume{ 1 };
 	Tex2D hdr_RectMap{};
 	Tex2D brdfLUT{};
     Tex2D screenTex{};

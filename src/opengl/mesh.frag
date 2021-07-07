@@ -18,39 +18,69 @@ uniform bool gamma;
 uniform bool diffuse;
 uniform bool specular;
 uniform bool sh;
-uniform vec3 env_sh[9];
+// uniform sampler3D sh_volume0;
+// uniform sampler3D sh_volume1;
+// uniform sampler3D sh_volume2;
+// uniform sampler3D sh_volume3;
+// uniform sampler3D sh_volume4;
+// uniform sampler3D sh_volume5;
+// uniform sampler3D sh_volume6;
+// uniform sampler3D sh_volume7;
+// uniform sampler3D sh_volume8;
+// const float c1 = 0.429043, c2 = 0.511664,c3 = 0.743125, c4 = 0.886227, c5 = 0.247708;
 
-
-const float c1 = 0.429043, c2 = 0.511664,c3 = 0.743125, c4 = 0.886227, c5 = 0.247708;
+uniform sampler3D SH_volume0; //Ar
+uniform sampler3D SH_volume1; //Ag
+uniform sampler3D SH_volume2; //Ab
+uniform sampler3D SH_volume3; //Br
+uniform sampler3D SH_volume4; //Bg
+uniform sampler3D SH_volume5; //Bb
+uniform sampler3D SH_volume6; //C 
 vec3 ShadeIrad(vec4 N) 
 {
     N = N.zxyw; // openGL to directX
-    const vec3 L00 = env_sh[0];
-    const vec3 L1n1 = env_sh[1];
-    const vec3 L10 = env_sh[2];
-    const vec3 L1p1 = env_sh[3];
-    const vec3 L2n2 = env_sh[4];
-    const vec3 L2n1 = env_sh[5];
-    const vec3 L20 = env_sh[6];
-    const vec3 L2p1 = env_sh[7];
-    const vec3 L2p2 = env_sh[8];
+    
+    // const vec3 L00 =  texture(sh_volume0, vec3(0,0,0)).rgb;
+    // const vec3 L1n1 = texture(sh_volume1, vec3(0,0,0)).rgb;
+    // const vec3 L10 =  texture(sh_volume2, vec3(0,0,0)).rgb;
+    // const vec3 L1p1 = texture(sh_volume3, vec3(0,0,0)).rgb;
+    // const vec3 L2n2 = texture(sh_volume4, vec3(0,0,0)).rgb;
+    // const vec3 L2n1 = texture(sh_volume5, vec3(0,0,0)).rgb;
+    // const vec3 L20 =  texture(sh_volume6, vec3(0,0,0)).rgb;
+    // const vec3 L2p1 = texture(sh_volume7, vec3(0,0,0)).rgb;
+    // const vec3 L2p2 = texture(sh_volume8, vec3(0,0,0)).rgb;
 
-    mat4 M_r = mat4(c1*L2p2.r,  c1*L2n2.r, c1*L2p1.r, c2*L1p1.r,   // 1. column
-                    c1*L2n2.r, -c1*L2p2.r, c1*L2n1.r, c2*L1n1.r,    // 2. column
-                    c1*L2p1.r,  c1*L2n1.r,  c3*L20.r,  c2*L10.r,    // 3. column
-                    c2*L1p1.r,  c2*L1n1.r,  c2*L10.r,  c4*L00.r - c5*L20.r);
+    // mat4 M_r = mat4(c1*L2p2.r,  c1*L2n2.r, c1*L2p1.r, c2*L1p1.r,   // 1. column
+    //                 c1*L2n2.r, -c1*L2p2.r, c1*L2n1.r, c2*L1n1.r,    // 2. column
+    //                 c1*L2p1.r,  c1*L2n1.r,  c3*L20.r,  c2*L10.r,    // 3. column
+    //                 c2*L1p1.r,  c2*L1n1.r,  c2*L10.r,  c4*L00.r - c5*L20.r);
 
-    mat4 M_g = mat4(c1*L2p2.g,  c1*L2n2.g, c1*L2p1.g, c2*L1p1.g,   // 1. column
-                    c1*L2n2.g, -c1*L2p2.g, c1*L2n1.g, c2*L1n1.g,    // 2. column
-                    c1*L2p1.g,  c1*L2n1.g,  c3*L20.g,  c2*L10.g,    // 3. column
-                    c2*L1p1.g,  c2*L1n1.g,  c2*L10.g,  c4*L00.g - c5*L20.g);
+    // mat4 M_g = mat4(c1*L2p2.g,  c1*L2n2.g, c1*L2p1.g, c2*L1p1.g,   // 1. column
+    //                 c1*L2n2.g, -c1*L2p2.g, c1*L2n1.g, c2*L1n1.g,    // 2. column
+    //                 c1*L2p1.g,  c1*L2n1.g,  c3*L20.g,  c2*L10.g,    // 3. column
+    //                 c2*L1p1.g,  c2*L1n1.g,  c2*L10.g,  c4*L00.g - c5*L20.g);
 
-    mat4 M_b = mat4(c1*L2p2.b,  c1*L2n2.b, c1*L2p1.b, c2*L1p1.b,   // 1. column
-                    c1*L2n2.b, -c1*L2p2.b, c1*L2n1.b, c2*L1n1.b,    // 2. column
-                    c1*L2p1.b,  c1*L2n1.b,  c3*L20.b,  c2*L10.b,    // 3. column
-                    c2*L1p1.b,  c2*L1n1.b,  c2*L10.b,  c4*L00.b - c5*L20.b);
+    // mat4 M_b = mat4(c1*L2p2.b,  c1*L2n2.b, c1*L2p1.b, c2*L1p1.b,   // 1. column
+    //                 c1*L2n2.b, -c1*L2p2.b, c1*L2n1.b, c2*L1n1.b,    // 2. column
+    //                 c1*L2p1.b,  c1*L2n1.b,  c3*L20.b,  c2*L10.b,    // 3. column
+    //                 c2*L1p1.b,  c2*L1n1.b,  c2*L10.b,  c4*L00.b - c5*L20.b);
 
-    return vec3(dot(N, M_r * N), dot(N, M_g * N), dot(N, M_b * N));
+    // return vec3(dot(N, M_r * N), dot(N, M_g * N), dot(N, M_b * N));
+
+    const vec4 Ar = texture(SH_volume0, vec3(0,0,0));
+    const vec4 Ag = texture(SH_volume1, vec3(0,0,0));
+    const vec4 Ab = texture(SH_volume2, vec3(0,0,0));
+    const vec4 Br = texture(SH_volume3, vec3(0,0,0));
+    const vec4 Bg = texture(SH_volume4, vec3(0,0,0));
+    const vec4 Bb = texture(SH_volume5, vec3(0,0,0));
+    const vec3 C  = texture(SH_volume6, vec3(0,0,0)).rgb;
+
+    const vec3 x = vec3(dot(Ar, N), dot(Ag, N), dot(Ab, N));
+    const vec4 BN = N.xxyz * N.yzzz;
+    const vec3 y = vec3(dot(Br, BN), dot(Bg, BN), dot(Bb, BN));
+    const vec3 z = C * (N.x*N.x - N.y*N.y);
+    return x+y+z;
+    // return x+0.001*y+0.001*z;
 }
 
 uniform sampler2D brdfLUT;

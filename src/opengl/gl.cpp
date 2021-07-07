@@ -396,6 +396,7 @@ void Mesh::render() {
     meshShader.uniform("irradiance", app.EnvMap("irradiance").active(1));
     meshShader.uniform("brdfLUT", app.brdfLUT.active(2));
     meshShader.uniform("prefilterMap", app.EnvMap("prefilter").active(3));
+    app.sh_volume.bind_sh_tex(meshShader);
 
     meshShader.uniform("model", Mat_model);
     meshShader.uniform("view", app.camera.GetViewMatrix());
@@ -403,7 +404,7 @@ void Mesh::render() {
     meshShader.uniform("cameraPos", app.camera.Position);
     // auto Mat_rotate = glm::mat4(glm::mat3(Mat_model));
     // auto sh = rotate_sh(app.env_sh, glm::transpose(Mat_rotate) * app.skybox->Mat_rotate);
-    meshShader.uniform("env_sh", app.env_sh.size(), app.env_sh.data());
+    //meshShader.uniform("env_sh", app.env_sh.size(), app.env_sh.data());
     meshShader.uniform("sh", app.sh);
     meshShader.uniform("envRotate", glm::transpose(app.skybox->Mat_rotate));
 

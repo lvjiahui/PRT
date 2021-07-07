@@ -4,7 +4,23 @@
 layout(local_size_x = SIZE) in;
 
 uniform samplerCube environment;
-layout (rgba32f, binding = 0) uniform image1D output_SH;
+// layout (rgba32f, binding = 0) uniform image3D output_SH0;
+// layout (rgba32f, binding = 1) uniform image3D output_SH1;
+// layout (rgba32f, binding = 2) uniform image3D output_SH2;
+// layout (rgba32f, binding = 3) uniform image3D output_SH3;
+// layout (rgba32f, binding = 4) uniform image3D output_SH4;
+// layout (rgba32f, binding = 5) uniform image3D output_SH5;
+// layout (rgba32f, binding = 6) uniform image3D output_SH6;
+// layout (rgba32f, binding = 7) uniform image3D output_SH7;
+// layout (rgba32f, binding = 8) uniform image3D output_SH8;
+layout (rgba32f, binding = 0) uniform image3D SH_Ar;
+layout (rgba32f, binding = 1) uniform image3D SH_Ag;
+layout (rgba32f, binding = 2) uniform image3D SH_Ab;
+layout (rgba32f, binding = 3) uniform image3D SH_Br;
+layout (rgba32f, binding = 4) uniform image3D SH_Bg;
+layout (rgba32f, binding = 5) uniform image3D SH_Bb;
+layout (rgba32f, binding = 6) uniform image3D SH_C;
+const float c1 = 0.429043, c2 = 0.511664, c3 = 0.743125, c4 = 0.886227, c5 = 0.247708;
 
 const float PI = 3.14159265359;
 const float sampleDelta = 2*PI/SIZE;
@@ -105,8 +121,44 @@ void main()
 
     // output
     if (xid == 0){
-        for(int i = 0; i < 9; i++)
-            imageStore(output_SH, i, phi_irradiance[0][i] * sampleDelta * sampleDelta);
+        // imageStore(output_SH0, ivec3(0,0,0), phi_irradiance[0][0] * sampleDelta * sampleDelta);
+        // imageStore(output_SH1, ivec3(0,0,0), phi_irradiance[0][1] * sampleDelta * sampleDelta);
+        // imageStore(output_SH2, ivec3(0,0,0), phi_irradiance[0][2] * sampleDelta * sampleDelta);
+        // imageStore(output_SH3, ivec3(0,0,0), phi_irradiance[0][3] * sampleDelta * sampleDelta);
+        // imageStore(output_SH4, ivec3(0,0,0), phi_irradiance[0][4] * sampleDelta * sampleDelta);
+        // imageStore(output_SH5, ivec3(0,0,0), phi_irradiance[0][5] * sampleDelta * sampleDelta);
+        // imageStore(output_SH6, ivec3(0,0,0), phi_irradiance[0][6] * sampleDelta * sampleDelta);
+        // imageStore(output_SH7, ivec3(0,0,0), phi_irradiance[0][7] * sampleDelta * sampleDelta);
+        // imageStore(output_SH8, ivec3(0,0,0), phi_irradiance[0][8] * sampleDelta * sampleDelta);
+
+        const vec3 L00 = phi_irradiance[0][0].rgb * sampleDelta * sampleDelta;
+        const vec3 L1n1= phi_irradiance[0][1].rgb * sampleDelta * sampleDelta;
+        const vec3 L10 = phi_irradiance[0][2].rgb * sampleDelta * sampleDelta;
+        const vec3 L1p1= phi_irradiance[0][3].rgb * sampleDelta * sampleDelta;
+        const vec3 L2n2= phi_irradiance[0][4].rgb * sampleDelta * sampleDelta;
+        const vec3 L2n1= phi_irradiance[0][5].rgb * sampleDelta * sampleDelta;
+        const vec3 L20 = phi_irradiance[0][6].rgb * sampleDelta * sampleDelta;
+        const vec3 L2p1= phi_irradiance[0][7].rgb * sampleDelta * sampleDelta;
+        const vec3 L2p2= phi_irradiance[0][8].rgb * sampleDelta * sampleDelta;
+        // Linear + constant polynomial terms : 2c2 (L11x + L1−1y + L10z) + c4L00 − c5L20
+        const vec3 SH_Ax = 2*c2*L1p1;
+        const vec3 SH_Ay = 2*c2*L1n1;
+        const vec3 SH_Az = 2*c2*L10;
+        const vec3 SH_Aw = c4*L00 - c5*L20;
+        imageStore(SH_Ar, ivec3(0,0,0), vec4(SH_Ax.r, SH_Ay.r, SH_Az.r, SH_Aw.r));
+        imageStore(SH_Ag, ivec3(0,0,0), vec4(SH_Ax.g, SH_Ay.g, SH_Az.g, SH_Aw.g));
+        imageStore(SH_Ab, ivec3(0,0,0), vec4(SH_Ax.b, SH_Ay.b, SH_Az.b, SH_Aw.b));
+        // 4 of the quadratic polynomials : 2c1 (L2−2xy + L21xz + L2−1yz) +  c3L20z2
+        const vec3 SH_Bxy = 2*c1*L2n2;
+        const vec3 SH_Bxz = 2*c1*L2p1;
+        const vec3 SH_Byz = 2*c1*L2n1;
+        const vec3 SH_Bz2 = c3*L20;
+        imageStore(SH_Br, ivec3(0,0,0), vec4(SH_Bxy.r, SH_Bxz.r, SH_Byz.r, SH_Bz2.r));
+        imageStore(SH_Bg, ivec3(0,0,0), vec4(SH_Bxy.g, SH_Bxz.g, SH_Byz.g, SH_Bz2.g));
+        imageStore(SH_Bb, ivec3(0,0,0), vec4(SH_Bxy.b, SH_Bxz.b, SH_Byz.b, SH_Bz2.b));
+        // Final quadratic polynomial :  c1L22 (x2 - y2)
+        imageStore(SH_C, ivec3(0,0,0), vec4(c1*L2p2, 1));
+        
     }
 
 }
