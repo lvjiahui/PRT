@@ -10,6 +10,8 @@
 namespace Shaders {
     Shader brdfShader;
     Shader screenShader;
+    Shader envShader;
+    Shader castlightShader;
     ComputeShader compShader;
 }
 
@@ -229,7 +231,29 @@ void ComputeShader::operator=(ComputeShader &&src) {
     src.shader = 0;
 }
 
+void ComputeShader::uniform(std::string name, int count, const glm::vec2 items[]) const {
+    glUniform2fv(loc(name), count, (GLfloat *)items);
+}
+
+void ComputeShader::uniform(std::string name, int count, const glm::vec3 items[]) const {
+    glUniform3fv(loc(name), count, (GLfloat *)items);
+}
+
+void ComputeShader::uniform(std::string name, GLfloat fl) const { glUniform1f(loc(name), fl); }
+
+void ComputeShader::uniform(std::string name, const glm::mat4 &mat) const {
+    glUniformMatrix4fv(loc(name), 1, GL_FALSE, &mat[0][0]);
+}
+
+void ComputeShader::uniform(std::string name, glm::vec3 vec3) const { glUniform3fv(loc(name), 1, &vec3[0]); }
+
+void ComputeShader::uniform(std::string name, glm::vec2 vec2) const { glUniform2fv(loc(name), 1, &vec2[0]); }
+
 void ComputeShader::uniform(std::string name, GLint i) const { glUniform1i(loc(name), i); }
+
+void ComputeShader::uniform(std::string name, GLuint i) const { glUniform1ui(loc(name), i); }
+
+void ComputeShader::uniform(std::string name, bool b) const { glUniform1i(loc(name), b); }
 
 GLuint ComputeShader::loc(std::string name) const { 
     auto location = glGetUniformLocation(program, name.c_str());
@@ -386,40 +410,11 @@ const std::vector<Mesh::Vert>& Mesh::verts() const { return _verts; }
 
 const std::vector<Mesh::Index>& Mesh::indices() const { return _idxs; }
 
-void Mesh::render() {
+void Mesh::render(Shader& shader) {
     if (dirty)
         update();
-    auto& app = App::get();
-    meshShader.bind();
+	shader.uniform("model", Mat_model);
     glBindVertexArray(vao);
-    // meshShader.uniform("environment", app.EnvMap("environment").active(0));
-    meshShader.uniform("irradiance", app.EnvMap("irradiance").active(1));
-    meshShader.uniform("brdfLUT", app.brdfLUT.active(2));
-    meshShader.uniform("prefilterMap", app.EnvMap("prefilter").active(3));
-    app.sh_volume.bind_sh_tex(meshShader);
-
-    meshShader.uniform("model", Mat_model);
-    meshShader.uniform("view", app.camera.GetViewMatrix());
-    meshShader.uniform("projection", app.Mat_projection);
-    meshShader.uniform("cameraPos", app.camera.Position);
-    // auto Mat_rotate = glm::mat4(glm::mat3(Mat_model));
-    // auto sh = rotate_sh(app.env_sh, glm::transpose(Mat_rotate) * app.skybox->Mat_rotate);
-    //meshShader.uniform("env_sh", app.env_sh.size(), app.env_sh.data());
-    meshShader.uniform("sh", app.sh);
-    meshShader.uniform("envRotate", glm::transpose(app.skybox->Mat_rotate));
-
-    meshShader.uniform("tonemap", app.tonemap);
-    meshShader.uniform("gamma", app.gamma);
-
-    meshShader.uniform("metal", app.metal);
-    meshShader.uniform("diffuse", app.diffuse);
-    meshShader.uniform("specular", app.specular);
-    meshShader.uniform("roughness", app.roughness);
-    if (app.metal)
-        meshShader.uniform("F0", glm::vec3{app.F0[0],app.F0[1],app.F0[2]});
-    else
-        meshShader.uniform("F0", glm::vec3{0.04});
-    meshShader.uniform("albedo", glm::vec3{app.albedo[0],app.albedo[1],app.albedo[2]});
     glDrawElements(GL_TRIANGLES, n_elem, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
 }
@@ -427,20 +422,20 @@ void Mesh::render() {
 Framebuffer::Framebuffer(){
     // setup framebuffer
     // ----------------------
-    glGenFramebuffers(1, &framebuffer);
-    glGenRenderbuffers(1, &renderbuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, framebuffer);
+    glGenFramebuffers(1, &framebufferobject);
+    glGenRenderbuffers(1, &depthbuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufferobject);
+    glBindRenderbuffer(GL_RENDERBUFFER, depthbuffer);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, framebufferobject);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 void Framebuffer::bind(){
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufferobject);
 }
 
 Framebuffer::~Framebuffer(){
-    glDeleteFramebuffers(1, &framebuffer);
-    glDeleteRenderbuffers(1, &renderbuffer);
+    glDeleteFramebuffers(1, &framebufferobject);
+    glDeleteRenderbuffers(1, &depthbuffer);
 }
 
 

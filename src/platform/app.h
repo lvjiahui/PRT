@@ -28,7 +28,11 @@ public:
 	void render();
 
 	Platform& plt;
-	SH_volume sh_volume{ 1 };
+	SH_volume sh_volume{ 8 };
+	float cast_light_intensity = 2;
+	float cast_light_cut_off = 0.9;
+	float cast_light_position[3] = {2, 0, 0};
+
 	Tex2D hdr_RectMap{};
 	Tex2D brdfLUT{};
     Tex2D screenTex{};
@@ -52,6 +56,7 @@ public:
 	float lod = 0;
 	float roughness = 0.2;
 	std::unique_ptr<SkyBox> skybox;
+	std::unique_ptr<Model> scene;
 
 	int max_path_length = 2;
 	int sh_resolution = 32;

@@ -26,9 +26,9 @@ Mesh processMesh(aiMesh* mesh, const aiScene* scene)
         if (mesh->HasNormals())
         {
             vert.norm = aiVec(mesh->mNormals[i]);
-            auto coeffs = rotate_cos_lobe(vert.norm);
-            for (int i = 0; i < coeffs.size(); i++)
-                vert.sh_coeff[i] = coeffs[i] * INV_PI;
+            // auto coeffs = rotate_cos_lobe(vert.norm);
+            // for (int i = 0; i < coeffs.size(); i++)
+            //     vert.sh_coeff[i] = coeffs[i] * INV_PI;
         }
         vertices.push_back(vert);
 
@@ -68,7 +68,8 @@ void Model::loadModel(std::string const& path)
 {
     // read file via ASSIMP
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices );
+    // const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices );
+    const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_JoinIdenticalVertices );
     // check for errors
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
     {

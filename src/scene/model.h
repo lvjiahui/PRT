@@ -18,11 +18,11 @@ public:
     }
 
     // draws the model, and thus all its meshes
-    void render()
+    void render(Shader& shader)
     {
         for (auto& mesh : meshes) {
             mesh.Mat_model = Mat_model;
-            mesh.render();
+            mesh.render(shader);
         }
     }
     

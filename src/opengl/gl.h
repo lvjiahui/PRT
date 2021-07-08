@@ -19,6 +19,8 @@ class ComputeShader;
 namespace Shaders {
     extern Shader brdfShader;
     extern Shader screenShader;
+    extern Shader envShader;
+    extern Shader castlightShader;
     extern ComputeShader compShader;
 } // namespace Shaders
 
@@ -67,7 +69,15 @@ public:
     void operator=(const ComputeShader &src) = delete;
     void bind() const;
     ~ComputeShader();
+    void uniform(std::string name, const glm::mat4 &mat) const;
+    void uniform(std::string name, glm::vec3 vec3) const;
+    void uniform(std::string name, glm::vec2 vec2) const;
     void uniform(std::string name, GLint i) const;
+    void uniform(std::string name, GLuint i) const;
+    void uniform(std::string name, GLfloat f) const;
+    void uniform(std::string name, bool b) const;
+    void uniform(std::string name, int count, const glm::vec2 items[]) const;
+    void uniform(std::string name, int count, const glm::vec3 items[]) const;
     GLuint program_id() { return program; };
 private:
     GLuint loc(std::string name) const;
@@ -79,7 +89,6 @@ private:
 
 class Mesh {
 public:
-    Shader meshShader = Shader{ fs::path{"src/opengl/mesh.vert"}, fs::path{"src/opengl/mesh.frag"} };
     typedef GLuint Index;
     struct Vert {
         glm::vec3 pos;
@@ -97,7 +106,7 @@ public:
     void operator=(const Mesh &src) = delete;
     void operator=(Mesh &&src);
 
-    void render();
+    void render(Shader& shader);
     void recreate(std::vector<Vert> &&vertices, std::vector<Index> &&indices);
     std::vector<Vert> &edit_verts();
     std::vector<Index> &edit_indices();
@@ -128,8 +137,8 @@ public:
     void bind();
     ~Framebuffer();
 private:
-    GLuint framebuffer;
-    GLuint renderbuffer;
+    GLuint framebufferobject;
+    GLuint depthbuffer;
 };
 
 class Tex2D {

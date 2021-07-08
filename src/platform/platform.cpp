@@ -126,14 +126,14 @@ Platform::Platform() {
 		fmt::print("glfw init failure\n");
 	}
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
 #ifndef NDEBUG
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
 #endif
 	window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "PRT", NULL, NULL);
 	glfwMakeContextCurrent(window);
 
-	glfwSwapInterval(1); // Enable vsync
+	glfwSwapInterval(0); // Enable vsync
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetScrollCallback(window, scroll_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
@@ -171,6 +171,12 @@ Platform::Platform() {
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);  
+
+	printf("opengl version: %s\n", glGetString(GL_VERSION));
+	// int size;
+	// glGetIntegerv(GL_MAX_TEXTURE_SIZE, &size);
+	// printf("GL_MAX_TEXTURE_SIZE: %d\n", size);
+
 }
 
 Platform::~Platform() { platform_shutdown(); }
