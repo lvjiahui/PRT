@@ -1,10 +1,8 @@
 #include "app.h"
 #include "platform.h"
 #include "util/util.h"
-#include "sh/image.h"
-#include "sh/spherical_harmonics.h"
-#include "raytracing/raytracing.h"
 #include <iostream>
+#include <sf_libs/stb_image.h>
 
 App::App(Platform& plt)
 	: plt(plt) {
@@ -15,7 +13,6 @@ App::App(Platform& plt)
 	probe_mesh = std::make_unique<Model>("data/probe.obj");
 	skybox = std::make_unique<SkyBox>();
 	lightProbe = std::make_unique<LightProbe>(*skybox);
-	rtscene = std::make_unique<RTScene>(model->meshes[0]);
 }
 
 void App::setup(Platform& plt)
@@ -30,15 +27,8 @@ void App::setup(Platform& plt)
 	auto& lightProbe = app->lightProbe;
 	auto& cubeMap = app->_CubeMap;
 
-
-	auto hdr = sh::HDR_Image{"data/hdr/newport_loft.hdr"};
-	// hdr.SetAll([&](double phi, double theta) {
-	// 	auto cos = sh::ToVector(phi, theta).dot(Eigen::Vector3d::UnitY());
-	// 	if(cos < 0) cos = 0;
-	// 	cos = cos*cos*cos;
-	// 	return Eigen::Array3f{cos};
-	// });
-	app->hdr_RectMap.imagef(hdr.width(), hdr.height(), hdr.pixels_);
+	std::string path = "data/hdr/newport_loft.hdr";
+	app->hdr_RectMap = load_hdr(path);
 
 	cubeMap.insert({"environment", CubeMap{512, 512}});
 	lightProbe->equirectangular_to_cubemap(app->hdr_RectMap, cubeMap["environment"]);
@@ -51,12 +41,6 @@ void App::setup(Platform& plt)
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 	app->sh_volume.print();
 
-
-
-	Tex2D sh_env{};
-	sh_env.imagef(hdr.width(), hdr.height(), hdr.pixels_);
-	cubeMap.insert({"sh_env", CubeMap{512, 512}});
-	lightProbe->equirectangular_to_cubemap(sh_env, cubeMap["sh_env"]);
 
 	cubeMap.insert({"irradiance", CubeMap{32, 32}});
 	lightProbe->irradiance(cubeMap["irradiance"]);
@@ -155,16 +139,6 @@ void App::render_imgui()
 
 void App::render_3d()
 {
-	if(ray_tracing && rtscene){
-		raytrace(*rtscene);
-		/* draw text to screen */
-		//screenTex.imagef(plt.SCR_WIDTH, plt.SCR_HEIGHT, (float*)pixels.data());
-		screenTex.imagei(plt.SCR_WIDTH, plt.SCR_HEIGHT, (unsigned char *)pixels.data());
-		Shaders::screenShader.bind();
-		Shaders::screenShader.uniform("screenTexture", screenTex.active());
-		screen_quad.render();
-		return;
-	}
 
 	app->sh_volume.relight();
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);

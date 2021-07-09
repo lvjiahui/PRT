@@ -8,7 +8,6 @@
 #include "util/camera.h"
 #include "scene/model.h"
 #include "sh/volume.h"
-class RTScene;
 
 class Platform;
 
@@ -80,12 +79,11 @@ private:
 	bool render_SH_probe = false;
 
 	float depth = 1;
-	const std::vector<const char*> map_choices = { "environment", "sh_env", "irradiance", "prefilter" };
+	const std::vector<const char*> map_choices = { "environment", "irradiance", "prefilter" };
 	std::map<std::string, CubeMap> _CubeMap;
     int map_current = 0;
 
 	ImVec4 clear_color = ImVec4(0.2f, 0.3f, 0.3f, 1.00f);
 	std::unique_ptr<Model> model;
 	std::unique_ptr<LightProbe> lightProbe;
-	std::unique_ptr<RTScene> rtscene;
 };
