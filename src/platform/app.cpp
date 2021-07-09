@@ -12,7 +12,7 @@ App::App(Platform& plt)
 	pixels_w.resize(plt.SCR_WIDTH * plt.SCR_HEIGHT);
 	model = std::make_unique<Model>("data/buddha.obj");
 	scene = std::make_unique<Model>("data/cube.obj");
-	//  model = std::make_unique<Model>("data/sphere.obj");
+	probe_mesh = std::make_unique<Model>("data/probe.obj");
 	skybox = std::make_unique<SkyBox>();
 	lightProbe = std::make_unique<LightProbe>(*skybox);
 	rtscene = std::make_unique<RTScene>(model->meshes[0]);
@@ -24,8 +24,6 @@ void App::setup(Platform& plt)
 
 	Shaders::brdfShader = Shader{ fs::path{"src/opengl/brdf.vert"}, fs::path{"src/opengl/brdf.frag"} };
 	Shaders::screenShader = Shader{ fs::path{"src/opengl/screen.vert"}, fs::path{"src/opengl/screen.frag"} };
-	//Shaders::compShader = ComputeShader{ fs::path{"src/opengl/test.comp"} };
-	Shaders::compShader = ComputeShader{ fs::path{"src/opengl/projectSH.comp"} };
 	Shaders::envShader = Shader{ fs::path{"src/opengl/mesh.vert"}, fs::path{"src/opengl/mesh.frag"} };
 	Shaders::castlightShader = Shader{ fs::path{"src/opengl/mesh.vert"}, fs::path{"src/opengl/castlight.frag"} };
 
@@ -142,8 +140,12 @@ void App::render_imgui()
 	// ImGui::ListBox("skybox", &map_current, map_choices.data(), map_choices.size());
 
 	ImGui::Separator();
+	ImGui::Checkbox("multi_bounce", &multi_bounce);
+	ImGui::SameLine();
+	ImGui::SliderFloat("atten", &atten, 0, 1);
+	ImGui::Checkbox("render SH probe", &render_SH_probe);
 	ImGui::DragFloat3("light position", cast_light_position, 0.01, -5, 5);
-	ImGui::SliderFloat("intensity", &cast_light_intensity, 0, 100);
+	ImGui::SliderFloat("intensity", &cast_light_intensity, 0, 300);
 	ImGui::SliderFloat("cutoff", &cast_light_cut_off, 0, 1);
 
 
@@ -199,39 +201,49 @@ void App::render_3d()
 	// 	skybox->setShader();
 	// 	skybox->render();
 	// }
+	static auto set_envshader = []()
+	{
+		auto &app = App::get();
+		Shaders::envShader.bind();
+		// Shaders::envShader.uniform("environment", app.EnvMap("environment").active(0));
+		Shaders::envShader.uniform("irradiance", app.EnvMap("irradiance").active(1));
+		Shaders::envShader.uniform("brdfLUT", app.brdfLUT.active(2));
+		Shaders::envShader.uniform("prefilterMap", app.EnvMap("prefilter").active(3));
+		app.sh_volume.bind_sh_tex(Shaders::envShader);
+
+		Shaders::envShader.uniform("view", app.camera.GetViewMatrix());
+		Shaders::envShader.uniform("projection", app.Mat_projection);
+		Shaders::envShader.uniform("cameraPos", app.camera.Position);
+		Shaders::envShader.uniform("sh", app.sh);
+		Shaders::envShader.uniform("envRotate", glm::transpose(app.skybox->Mat_rotate));
+
+		Shaders::envShader.uniform("tonemap", app.tonemap);
+		Shaders::envShader.uniform("gamma", app.gamma);
+
+		Shaders::envShader.uniform("metal", app.metal);
+		Shaders::envShader.uniform("diffuse", app.diffuse);
+		Shaders::envShader.uniform("specular", app.specular);
+		Shaders::envShader.uniform("roughness", app.roughness);
+		if (app.metal)
+			Shaders::envShader.uniform("F0", glm::vec3{app.F0[0], app.F0[1], app.F0[2]});
+		else
+			Shaders::envShader.uniform("F0", glm::vec3{0.04});
+		Shaders::envShader.uniform("albedo", glm::vec3{app.albedo[0], app.albedo[1], app.albedo[2]});
+	};
 
 	if (model && render_model)
 	{
-		static auto set_envshader = []()
-		{
-			auto &app = App::get();
-			Shaders::envShader.bind();
-			// Shaders::envShader.uniform("environment", app.EnvMap("environment").active(0));
-			Shaders::envShader.uniform("irradiance", app.EnvMap("irradiance").active(1));
-			Shaders::envShader.uniform("brdfLUT", app.brdfLUT.active(2));
-			Shaders::envShader.uniform("prefilterMap", app.EnvMap("prefilter").active(3));
-			app.sh_volume.bind_sh_tex(Shaders::envShader);
-
-			Shaders::envShader.uniform("view", app.camera.GetViewMatrix());
-			Shaders::envShader.uniform("projection", app.Mat_projection);
-			Shaders::envShader.uniform("cameraPos", app.camera.Position);
-			Shaders::envShader.uniform("sh", app.sh);
-			Shaders::envShader.uniform("envRotate", glm::transpose(app.skybox->Mat_rotate));
-
-			Shaders::envShader.uniform("tonemap", app.tonemap);
-			Shaders::envShader.uniform("gamma", app.gamma);
-
-			Shaders::envShader.uniform("metal", app.metal);
-			Shaders::envShader.uniform("diffuse", app.diffuse);
-			Shaders::envShader.uniform("specular", app.specular);
-			Shaders::envShader.uniform("roughness", app.roughness);
-			if (app.metal)
-				Shaders::envShader.uniform("F0", glm::vec3{app.F0[0], app.F0[1], app.F0[2]});
-			else
-				Shaders::envShader.uniform("F0", glm::vec3{0.04});
-			Shaders::envShader.uniform("albedo", glm::vec3{app.albedo[0], app.albedo[1], app.albedo[2]});
-		};
 		set_envshader();
 		model->render(Shaders::envShader);
+	}
+
+	if (probe_mesh && render_SH_probe)
+	{
+		set_envshader();
+		for (auto pos : sh_volume.world_position) { //TODO: instance drawing results in [out of memory], why?
+			probe_mesh->Mat_model = glm::translate(glm::mat4(1), pos);
+			probe_mesh->render(Shaders::envShader);
+		}
+
 	}
 }

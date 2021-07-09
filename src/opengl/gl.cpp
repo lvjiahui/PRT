@@ -12,7 +12,6 @@ namespace Shaders {
     Shader screenShader;
     Shader envShader;
     Shader castlightShader;
-    ComputeShader compShader;
 }
 
 Shader::Shader() {}

@@ -15,6 +15,7 @@ public:
     void print();
     void project_sh();
     void bind_sh_tex(Shader&);
+    void bind_sh_tex(ComputeShader& shader);
     // ComputeShader project_shader{ fs::path{"src/opengl/image_projectSH.comp"} };
     ComputeShader project_shader{ fs::path{"src/opengl/projectSH.comp"} };
     ComputeShader relight_shader{ fs::path{"src/opengl/relight.comp"} };
@@ -30,6 +31,7 @@ public:
     std::vector<GLuint> probe_radiance;
     std::vector<GLuint> probe_GB_pos;
     std::vector<GLuint> probe_GB_norm;
+    std::vector<glm::vec3> world_position;
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.01f, 100.0f);
     
     glm::mat4 captureViews(glm::vec3 position, int face);

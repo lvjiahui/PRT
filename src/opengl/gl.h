@@ -21,7 +21,6 @@ namespace Shaders {
     extern Shader screenShader;
     extern Shader envShader;
     extern Shader castlightShader;
-    extern ComputeShader compShader;
 } // namespace Shaders
 
 class Shader {
@@ -107,6 +106,7 @@ public:
     void operator=(Mesh &&src);
 
     void render(Shader& shader);
+    void instance_render(int num);
     void recreate(std::vector<Vert> &&vertices, std::vector<Index> &&indices);
     std::vector<Vert> &edit_verts();
     std::vector<Index> &edit_indices();

@@ -15,15 +15,10 @@ SH_volume::SH_volume(GLsizei _probe_res) : probe_res(_probe_res)
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		// glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA32F, probe_res, probe_res, probe_res, 0, GL_RGBA, GL_FLOAT, nullptr);
 		glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA32F, probe_res, probe_res, probe_res);
 	}
 
-	// // probe cube map array
-	// glGenTextures(1, &probe_tex);
-	// glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, probe_tex);
-	// glTexStorage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 1, GL_RGBA16F, cubemap_res, cubemap_res, 6 * probe_res*probe_res*probe_res);
-	//
+	// probe 
 	int num_probe = probe_res * probe_res * probe_res;
 	probe_radiance.resize(num_probe);
 	probe_GB_norm.resize(num_probe);
@@ -47,6 +42,21 @@ SH_volume::SH_volume(GLsizei _probe_res) : probe_res(_probe_res)
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	}
+
+	
+	// float ds = 2*scene_size / (probe_res-1);
+	float ds = 2*scene_size / probe_res;
+	for (int x_i = 0; x_i < probe_res; x_i++)
+		for (int y_i = 0; y_i < probe_res; y_i++)
+			for (int z_i = 0; z_i < probe_res; z_i++){
+				// if(probe_res == 1) {
+				// 	pos = glm::vec3(0,0,0);
+				// } else {
+				// 	pos = -scene_size + ds* glm::vec3(x_i, y_i ,z_i);
+				// }
+				glm::vec3 pos = -scene_size + ds * (glm::vec3(0.5) + glm::vec3(x_i, y_i ,z_i));
+				world_position.push_back(pos);
+			}
 }
 
 SH_volume::~SH_volume()
@@ -71,33 +81,24 @@ void SH_volume::bake()
 	app.captureFB.bind(); //glBindFramebuffer
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cubemap_res, cubemap_res);
 
-	for (int x_i = 0; x_i < probe_res; x_i++)
-		for (int y_i = 0; y_i < probe_res; y_i++)
-			for (int z_i = 0; z_i < probe_res; z_i++)
-			{
-				GLint cubemap_index = (x_i * probe_res + y_i) * probe_res + z_i;
-				glm::vec3 pos;
-				if(probe_res == 1) {
-					pos = glm::vec3(0,0,0);
-				} else {
-					float ds = 2*scene_size / (probe_res-1);
-					pos = -scene_size + ds* glm::vec3(x_i, y_i ,z_i);
-				}
-				fmt::print("probe_pos: {} {} {}\n", pos[0], pos[1], pos[2]);
 
-				for (int face = 0; face < 6; face++)
-				{
-					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, probe_GB_pos[cubemap_index], 0);
-					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, probe_GB_norm[cubemap_index], 0);
-					GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    				glDrawBuffers(2, attachments);
-					if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        				std::cout << "Framebuffer not complete!" << std::endl;
-					glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-					gbuffer_shader.uniform("view", captureViews(pos, face));
-					app.scene->render(gbuffer_shader);
-				}
-			}
+	int num_probe = probe_res * probe_res * probe_res;
+	for (int i = 0; i < num_probe; i++) {
+		glm::vec3 pos = world_position[i];
+		fmt::print("probe_pos: {} {} {}\n", pos[0], pos[1], pos[2]);
+		for (int face = 0; face < 6; face++)
+		{
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, probe_GB_pos[i], 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, probe_GB_norm[i], 0);
+			GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    		glDrawBuffers(2, attachments);
+			if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    			std::cout << "Framebuffer not complete!" << std::endl;
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			gbuffer_shader.uniform("view", captureViews(pos, face));
+			app.scene->render(gbuffer_shader);
+		}
+	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
@@ -145,6 +146,9 @@ void SH_volume::relight()
 	relight_shader.uniform("light.cutOff", app.cast_light_cut_off);
 	relight_shader.uniform("ambient.position", glm::vec3(0,0,0));
 	relight_shader.uniform("ambient.intensity", 0.f*glm::vec3(1));
+	relight_shader.uniform("multi_bounce", app.multi_bounce);
+	relight_shader.uniform("atten", app.atten);
+	bind_sh_tex(relight_shader);
 	for (int i = 0; i < num_probe; i++) {
 		glBindImageTexture(0, probe_GB_pos[i], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
 		glBindImageTexture(1, probe_GB_norm[i], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
@@ -188,6 +192,17 @@ void SH_volume::project_sh()
 }
 
 void SH_volume::bind_sh_tex(Shader& shader)
+{
+	shader.bind();
+	for (int i = 0; i < num_sh_tex; i++) {
+		int tex_unit = 16 - num_sh_tex + i;
+		glActiveTexture(GL_TEXTURE0 + tex_unit);
+		glBindTexture(GL_TEXTURE_3D, sh_tex[i]);
+		shader.uniform("SH_volume" + std::to_string(i), tex_unit);
+	}
+}
+
+void SH_volume::bind_sh_tex(ComputeShader& shader)
 {
 	shader.bind();
 	for (int i = 0; i < num_sh_tex; i++) {

@@ -29,9 +29,11 @@ public:
 
 	Platform& plt;
 	SH_volume sh_volume{ 8 };
-	float cast_light_intensity = 2;
+	bool multi_bounce = false;
+	float atten = 0.1;
+	float cast_light_intensity = 100;
 	float cast_light_cut_off = 0.9;
-	float cast_light_position[3] = {2, 0, 0};
+	float cast_light_position[3] = {4, 0, 0};
 
 	Tex2D hdr_RectMap{};
 	Tex2D brdfLUT{};
@@ -48,15 +50,17 @@ public:
 	bool gamma = true;
 	bool white_bk = false;
 	float F0[3] = {0.562, 0.565, 0.578};
-	float albedo[3] = {0.5f, 0.05f, 0.05f};
+	// float albedo[3] = {0.5f, 0.05f, 0.05f};
+	float albedo[3] = {1.f, 1.f, 1.f};
 	bool metal = false;
 	bool diffuse = true;
-	bool sh = false;
-	bool specular = true;
+	bool sh = true;
+	bool specular = false;
 	float lod = 0;
 	float roughness = 0.2;
 	std::unique_ptr<SkyBox> skybox;
 	std::unique_ptr<Model> scene;
+	std::unique_ptr<Model> probe_mesh;
 
 	int max_path_length = 2;
 	int sh_resolution = 32;
@@ -73,6 +77,7 @@ private:
 	bool rotate_model = false;
 	bool rotate_env = false;
 	bool render_model = true;
+	bool render_SH_probe = false;
 
 	float depth = 1;
 	const std::vector<const char*> map_choices = { "environment", "sh_env", "irradiance", "prefilter" };

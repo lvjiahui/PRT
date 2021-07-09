@@ -6,6 +6,37 @@ layout (rgba16f, binding = 0) uniform imageCube WorldPos;
 layout (rgba16f, binding = 1) uniform imageCube Normal;
 layout (rgba16f, binding = 2) uniform imageCube radiance;
 
+uniform bool multi_bounce;
+uniform float atten;
+uniform sampler3D SH_volume0; //Ar
+uniform sampler3D SH_volume1; //Ag
+uniform sampler3D SH_volume2; //Ab
+uniform sampler3D SH_volume3; //Br
+uniform sampler3D SH_volume4; //Bg
+uniform sampler3D SH_volume5; //Bb
+uniform sampler3D SH_volume6; //C 
+const float scene_size = 6;
+vec3 ShadeIrad(vec4 N, vec3 pos) 
+{
+    N = N.zxyw; // openGL to directX
+    
+    vec3 SHCoord = (pos - (-1*scene_size)) / (2*scene_size); //[0, 1]
+    const vec4 Ar = texture(SH_volume0, SHCoord);
+    const vec4 Ag = texture(SH_volume1, SHCoord);
+    const vec4 Ab = texture(SH_volume2, SHCoord);
+    const vec4 Br = texture(SH_volume3, SHCoord);
+    const vec4 Bg = texture(SH_volume4, SHCoord);
+    const vec4 Bb = texture(SH_volume5, SHCoord);
+    const vec3 C  = texture(SH_volume6, SHCoord).rgb;
+
+    const vec3 x = vec3(dot(Ar, N), dot(Ag, N), dot(Ab, N));
+    const vec4 BN = N.xxyz * N.yzzz;
+    const vec3 y = vec3(dot(Br, BN), dot(Bg, BN), dot(Bb, BN));
+    const vec3 z = C * (N.x*N.x - N.y*N.y);
+    // return max(x+0.001*y+0.001*z, vec3(0,0,0));
+    return max(x+y+z, vec3(0,0,0));
+
+}
 
 struct CastLight {
     vec3 intensity;
@@ -42,6 +73,19 @@ void main()
     float incoming_cos = max(dot(normalize(ambient.position - pos), N),0);
     float dist = length(ambient.position - pos);
     rad += ambient.intensity * incoming_cos / (dist*dist);
+
+    vec3 albedo = vec3(1);
+
+    if(multi_bounce){ // TODO:fix it
+        rad += atten*ShadeIrad(vec4(N,1), pos);
+    }
+
+    //hack 
+    if(pos.x > 6){
+        albedo = vec3(0);
+        albedo[(int(pos.y/2+100) + int(pos.z/2+100))% 3] = 1;
+    }
+    rad *= albedo;
 
     imageStore(radiance, texCoord, vec4(rad,1));    
     

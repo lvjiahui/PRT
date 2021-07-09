@@ -72,6 +72,14 @@ void main()
     //SH
     color += ShadeIrad(vec4(N,1));
 
+    //hack 
+    vec3 albedo = vec3(1);
+    if(WorldPos.x > 6){
+        albedo = vec3(0);
+        albedo[(int(WorldPos.y/2+100) + int(WorldPos.z/2+100))% 3] = 1;
+    }
+    color *= albedo;
+
     // tonemap
         color = color / (color + vec3(1.0));
     // gamma
