@@ -9,22 +9,13 @@ uniform int probe_yid;
 uniform int probe_zid;
 
 uniform samplerCube environment;
-// layout (rgba32f, binding = 0) uniform image3D output_SH0;
-// layout (rgba32f, binding = 1) uniform image3D output_SH1;
-// layout (rgba32f, binding = 2) uniform image3D output_SH2;
-// layout (rgba32f, binding = 3) uniform image3D output_SH3;
-// layout (rgba32f, binding = 4) uniform image3D output_SH4;
-// layout (rgba32f, binding = 5) uniform image3D output_SH5;
-// layout (rgba32f, binding = 6) uniform image3D output_SH6;
-// layout (rgba32f, binding = 7) uniform image3D output_SH7;
-// layout (rgba32f, binding = 8) uniform image3D output_SH8;
-layout (rgba32f, binding = 0) uniform image3D SH_Ar;
-layout (rgba32f, binding = 1) uniform image3D SH_Ag;
-layout (rgba32f, binding = 2) uniform image3D SH_Ab;
-layout (rgba32f, binding = 3) uniform image3D SH_Br;
-layout (rgba32f, binding = 4) uniform image3D SH_Bg;
-layout (rgba32f, binding = 5) uniform image3D SH_Bb;
-layout (rgba32f, binding = 6) uniform image3D SH_C;
+layout (rgba16f, binding = 0) uniform image3D SH_Ar;
+layout (rgba16F, binding = 1) uniform image3D SH_Ag;
+layout (rgba16F, binding = 2) uniform image3D SH_Ab;
+layout (rgba16F, binding = 3) uniform image3D SH_Br;
+layout (rgba16F, binding = 4) uniform image3D SH_Bg;
+layout (rgba16F, binding = 5) uniform image3D SH_Bb;
+layout (rgba16F, binding = 6) uniform image3D SH_C;
 const float c1 = 0.429043, c2 = 0.511664, c3 = 0.743125, c4 = 0.886227, c5 = 0.247708;
 
 const float PI = 3.14159265359;
@@ -126,15 +117,6 @@ void main()
 
     // output
     if (xid == 0){
-        // imageStore(output_SH0, probe_id, phi_irradiance[0][0] * sampleDelta * sampleDelta);
-        // imageStore(output_SH1, probe_id, phi_irradiance[0][1] * sampleDelta * sampleDelta);
-        // imageStore(output_SH2, probe_id, phi_irradiance[0][2] * sampleDelta * sampleDelta);
-        // imageStore(output_SH3, probe_id, phi_irradiance[0][3] * sampleDelta * sampleDelta);
-        // imageStore(output_SH4, probe_id, phi_irradiance[0][4] * sampleDelta * sampleDelta);
-        // imageStore(output_SH5, probe_id, phi_irradiance[0][5] * sampleDelta * sampleDelta);
-        // imageStore(output_SH6, probe_id, phi_irradiance[0][6] * sampleDelta * sampleDelta);
-        // imageStore(output_SH7, probe_id, phi_irradiance[0][7] * sampleDelta * sampleDelta);
-        // imageStore(output_SH8, probe_id, phi_irradiance[0][8] * sampleDelta * sampleDelta);
         const ivec3 probe_id = ivec3(probe_xid, probe_yid, probe_zid);
 
         const vec3 L00 = phi_irradiance[0][0].rgb * sampleDelta * sampleDelta;

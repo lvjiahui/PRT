@@ -14,23 +14,21 @@
 
 namespace fs = std::filesystem;
 
-class Shader;
-class ComputeShader;
+class RenderShader;
 namespace Shaders {
-    extern Shader brdfShader;
-    extern Shader screenShader;
-    extern Shader envShader;
-    extern Shader castlightShader;
+    extern RenderShader brdfShader;
+    extern RenderShader screenShader;
+    extern RenderShader envShader;
+    extern RenderShader castlightShader;
 } // namespace Shaders
 
 class Shader {
 public:
-    Shader();
-    Shader(std::string vertex_code, std::string fragment_code);
-    Shader(fs::path vertex_path, fs::path fragment_path);
+    Shader() {};
     Shader(const Shader &src) = delete;
     Shader(Shader &&src);
     ~Shader();
+    void load(std::vector<fs::path> shader_paths);
 
     void operator=(const Shader &src) = delete;
     void operator=(Shader &&src);
@@ -47,43 +45,32 @@ public:
     void uniform(std::string name, int count, const glm::vec2 items[]) const;
     void uniform(std::string name, int count, const glm::vec3 items[]) const;
     void uniform_block(std::string name, GLuint i) const;
+    virtual void create_shader() = 0;
 
-private:
-    void load(std::string vertex_code, std::string fragment_code);
+protected:
     GLuint loc(std::string name) const;
-    static bool validate(GLuint program, std::string code={});
+    static bool check_compiled(GLuint shader, std::string code={});
+    static bool check_linked(GLuint program);
 
     GLuint program = 0;
-    GLuint v = 0, f = 0;
+    std::vector<std::string> shader_codes;
+    std::vector<GLuint> shaders;
 
     void destroy();
 };
 
-class ComputeShader {
+class RenderShader : public Shader {
+public:
+    RenderShader() {};
+    RenderShader(std::initializer_list<fs::path> shader_paths) { load(shader_paths); }
+    void create_shader() override;
+};
+
+class ComputeShader : public Shader {
 public:
     ComputeShader() {};
-    explicit ComputeShader(fs::path shader_path);
-    ComputeShader(const ComputeShader &src) = delete;
-    void operator=(ComputeShader&& src);
-    void operator=(const ComputeShader &src) = delete;
-    void bind() const;
-    ~ComputeShader();
-    void uniform(std::string name, const glm::mat4 &mat) const;
-    void uniform(std::string name, glm::vec3 vec3) const;
-    void uniform(std::string name, glm::vec2 vec2) const;
-    void uniform(std::string name, GLint i) const;
-    void uniform(std::string name, GLuint i) const;
-    void uniform(std::string name, GLfloat f) const;
-    void uniform(std::string name, bool b) const;
-    void uniform(std::string name, int count, const glm::vec2 items[]) const;
-    void uniform(std::string name, int count, const glm::vec3 items[]) const;
-    GLuint program_id() { return program; };
-private:
-    GLuint loc(std::string name) const;
-    static bool validate(GLuint program, std::string code={});
-    void destroy();
-    GLuint shader = 0;
-    GLuint program = 0;
+    ComputeShader(std::initializer_list<fs::path> shader_paths) { load(shader_paths); }
+    void create_shader() override;
 };
 
 class Mesh {
@@ -230,7 +217,7 @@ private:
 
 class SkyBox {
 public:
-    Shader skyboxShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/skybox.frag"} };
+    RenderShader skyboxShader = RenderShader{ fs::path{"src/shaders/skybox.vert"}, fs::path{"src/shaders/skybox.frag"} };
     SkyBox();
     void create();
     void setShader();
@@ -296,9 +283,9 @@ public:
 
 private:
     SkyBox &skybox;
-    Shader rectangleShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/rectangle2cube.frag"} };
-    Shader irradianceShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/irradiance.frag"} };
-    Shader prefilterShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/prefilter.frag"} };
+    RenderShader rectangleShader = RenderShader{ fs::path{"src/shaders/skybox.vert"}, fs::path{"src/shaders/rectangle2cube.frag"} };
+    RenderShader irradianceShader = RenderShader{ fs::path{"src/shaders/skybox.vert"}, fs::path{"src/shaders/irradiance.frag"} };
+    RenderShader prefilterShader = RenderShader{ fs::path{"src/shaders/skybox.vert"}, fs::path{"src/shaders/prefilter.frag"} };
 
     // set up projection and view matrices for capturing data onto the 6 cubemap face directions
     // ----------------------------------------------------------------------------------------------

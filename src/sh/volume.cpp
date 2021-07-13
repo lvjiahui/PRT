@@ -15,7 +15,7 @@ SH_volume::SH_volume(GLsizei _probe_res) : probe_res(_probe_res)
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA32F, probe_res, probe_res, probe_res);
+		glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA16F, probe_res, probe_res, probe_res);
 	}
 
 	// probe 
@@ -57,6 +57,36 @@ SH_volume::SH_volume(GLsizei _probe_res) : probe_res(_probe_res)
 				glm::vec3 pos = -scene_size + ds * (glm::vec3(0.5) + glm::vec3(x_i, y_i ,z_i));
 				world_position.push_back(pos);
 			}
+
+	
+	// pack all cubemap to a big 2D texture
+	glGenTextures(1, &GB_pos_2D);
+	glBindTexture(GL_TEXTURE_2D, GB_pos_2D);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, cubemap_res*6*probe_res, cubemap_res*probe_res*probe_res);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glGenTextures(1, &GB_norm_2D);
+	glBindTexture(GL_TEXTURE_2D, GB_norm_2D);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, cubemap_res*6*probe_res, cubemap_res*probe_res*probe_res);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// precomputed SH and solid angle
+	// glGenTextures(1, &precomp_SH0123);
+	// glBindTexture(GL_TEXTURE_2D, precomp_SH0123);
+	// glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, cubemap_res*6, cubemap_res);
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	// glGenTextures(1, &precomp_SH4567);
+	// glBindTexture(GL_TEXTURE_2D, precomp_SH4567);
+	// glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, cubemap_res*6, cubemap_res);
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	// glGenTextures(1, &precomp_SH8);
+	// glBindTexture(GL_TEXTURE_2D, precomp_SH8);
+	// glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, cubemap_res*6, cubemap_res);
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
 SH_volume::~SH_volume()
@@ -103,7 +133,29 @@ void SH_volume::bake()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
 
+	// precomputed SH and solid angle
+	// precomp_SH_shader.bind();
+	// glBindImageTexture(0, precomp_SH0123, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	// glBindImageTexture(1, precomp_SH4567, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	// glBindImageTexture(2, precomp_SH8, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	// glDispatchCompute(8, 8, 6);
 
+	// pack all cubemap to a big 2D texture
+	for (int x_i = 0; x_i < probe_res; x_i++)
+		for (int y_i = 0; y_i < probe_res; y_i++)
+			for (int z_i = 0; z_i < probe_res; z_i++)
+				for (int face = 0; face < 6; face++)
+				{
+					GLint cubemap_index = (x_i * probe_res + y_i) * probe_res + z_i;
+					GLint dstX = cubemap_res * (6 * x_i + face);
+					GLint dstY = cubemap_res * (probe_res * z_i + y_i);
+					glCopyImageSubData(probe_GB_norm[cubemap_index], GL_TEXTURE_CUBE_MAP, 0, 0, 0, face,
+					                   GB_norm_2D, GL_TEXTURE_2D, 0, dstX, dstY, 0,
+					                   cubemap_res, cubemap_res, 1);
+					glCopyImageSubData(probe_GB_pos[cubemap_index], GL_TEXTURE_CUBE_MAP, 0, 0, 0, face,
+					                   GB_pos_2D, GL_TEXTURE_2D, 0, dstX, dstY, 0,
+					                   cubemap_res, cubemap_res, 1);
+				}
 }
 
 void SH_volume::print()
@@ -137,58 +189,103 @@ void SH_volume::print()
 
 void SH_volume::relight()
 {
-	auto& app = App::get();
-	int num_probe = probe_res * probe_res * probe_res;
-	relight_shader.bind();
-	relight_shader.uniform("light.intensity", app.cast_light_intensity*glm::vec3(1,1,1));
-	relight_shader.uniform("light.position", glm::vec3{app.cast_light_position[0], app.cast_light_position[1], app.cast_light_position[2]});
-	relight_shader.uniform("light.direction", glm::vec3(1,0,0));
-	relight_shader.uniform("light.cutOff", app.cast_light_cut_off);
-	relight_shader.uniform("ambient.position", glm::vec3(0,0,0));
-	relight_shader.uniform("ambient.intensity", 0.f*glm::vec3(1));
-	relight_shader.uniform("multi_bounce", app.multi_bounce);
-	relight_shader.uniform("atten", app.atten);
-	bind_sh_tex(relight_shader);
-	for (int i = 0; i < num_probe; i++) {
-		glBindImageTexture(0, probe_GB_pos[i], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-		glBindImageTexture(1, probe_GB_norm[i], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-		glBindImageTexture(2, probe_radiance[i], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		glDispatchCompute(cubemap_res/8, cubemap_res/8, 6);
-	}
+	// auto& app = App::get();
+	// int num_probe = probe_res * probe_res * probe_res;
+	// relight_shader.bind();
+	// relight_shader.uniform("light.intensity", app.cast_light_intensity*glm::vec3(1,1,1));
+	// relight_shader.uniform("light.position", glm::vec3{app.cast_light_position[0], app.cast_light_position[1], app.cast_light_position[2]});
+	// relight_shader.uniform("light.direction", glm::vec3(1,0,0));
+	// relight_shader.uniform("light.cutOff", app.cast_light_cut_off);
+	// relight_shader.uniform("ambient.position", glm::vec3(0,0,0));
+	// relight_shader.uniform("ambient.intensity", 0.f*glm::vec3(1));
+	// relight_shader.uniform("multi_bounce", app.multi_bounce);
+	// relight_shader.uniform("atten", app.atten);
+	// bind_sh_tex(relight_shader);
+	// for (int i = 0; i < num_probe; i++) {
+	// 	glBindImageTexture(0, probe_GB_pos[i], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+	// 	glBindImageTexture(1, probe_GB_norm[i], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+	// 	glBindImageTexture(2, probe_radiance[i], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	// 	glDispatchCompute(cubemap_res/8, cubemap_res/8, 6);
+	// }
 }
 
 void SH_volume::project_sh()
 {
-	project_shader.bind();
-	// shader.uniform("environment", App::get().EnvMap("environment").active());
 
+	relight_project_shader.bind();
+	relight_project_shader.uniform("probe_res", probe_res);
+	// direct light
+	auto& app = App::get();
+	relight_project_shader.uniform("light.intensity", app.cast_light_intensity*glm::vec3(1,1,1));
+	relight_project_shader.uniform("light.position", glm::vec3{app.cast_light_position[0], app.cast_light_position[1], app.cast_light_position[2]});
+	relight_project_shader.uniform("light.direction", glm::vec3(1,0,0));
+	relight_project_shader.uniform("light.cutOff", app.cast_light_cut_off);
+	relight_project_shader.uniform("ambient.position", glm::vec3(0,0,0));
+	relight_project_shader.uniform("ambient.intensity", 0.f*glm::vec3(1));
+	relight_project_shader.uniform("multi_bounce", app.multi_bounce);
+	relight_project_shader.uniform("atten", app.atten);
+	// SH project
 	for (int i = 0; i < num_sh_tex; i++) {
-		glBindImageTexture(i, sh_tex[i], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+		glBindImageTexture(i, sh_tex[i], 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F);
 	}
+	// glActiveTexture(GL_TEXTURE0 + 71);
+	// glBindTexture(GL_TEXTURE_2D, precomp_SH0123);
+	// relight_project_shader.uniform("precomp_SH0123", 71);
+	// glActiveTexture(GL_TEXTURE0 + 72);
+	// glBindTexture(GL_TEXTURE_2D, precomp_SH4567);
+	// relight_project_shader.uniform("precomp_SH4567", 72);
+	// glActiveTexture(GL_TEXTURE0 + 73);
+	// glBindTexture(GL_TEXTURE_2D, precomp_SH8);
+	// relight_project_shader.uniform("precomp_SH8", 73);
+	glActiveTexture(GL_TEXTURE0 + 74);
+	glBindTexture(GL_TEXTURE_2D, GB_pos_2D);
+	relight_project_shader.uniform("WorldPos", 74);
+	glActiveTexture(GL_TEXTURE0 + 75);
+	glBindTexture(GL_TEXTURE_2D, GB_norm_2D);
+	relight_project_shader.uniform("Normal", 75);
 
-	int num_probe = probe_res * probe_res * probe_res;
-	int texture_unit = 0;
-	for (int x_i = 0; x_i < probe_res; x_i++)
-		for (int y_i = 0; y_i < probe_res; y_i++)
-			for (int z_i = 0; z_i < probe_res; z_i++)
-			{
-				project_shader.uniform("probe_xid", x_i);
-				project_shader.uniform("probe_yid", y_i);
-				project_shader.uniform("probe_zid", z_i);
+	glDispatchCompute(8, 64, 1);
 
-				GLint cubemap_index = (x_i * probe_res + y_i) * probe_res + z_i;
-				glActiveTexture(GL_TEXTURE0+texture_unit);
-				glBindTexture(GL_TEXTURE_CUBE_MAP, probe_radiance[cubemap_index]);
-				project_shader.uniform("environment", texture_unit);
+	// project_shader.bind();
+
+	// // glActiveTexture(GL_TEXTURE0 + 71);
+	// // glBindTexture(GL_TEXTURE_CUBE_MAP, precomp_SH0123);
+	// // project_shader.uniform("precomp_SH0123", 71);
+	// // glActiveTexture(GL_TEXTURE0 + 72);
+	// // glBindTexture(GL_TEXTURE_CUBE_MAP, precomp_SH4567);
+	// // project_shader.uniform("precomp_SH4567", 72);
+	// // glActiveTexture(GL_TEXTURE0 + 73);
+	// // glBindTexture(GL_TEXTURE_CUBE_MAP, precomp_SH8);
+	// // project_shader.uniform("precomp_SH8", 73);
+
+	// for (int i = 0; i < num_sh_tex; i++) {
+	// 	glBindImageTexture(i, sh_tex[i], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	// }
+
+	// int num_probe = probe_res * probe_res * probe_res;
+	// int texture_unit = 0;
+	// for (int x_i = 0; x_i < probe_res; x_i++)
+	// 	for (int y_i = 0; y_i < probe_res; y_i++)
+	// 		for (int z_i = 0; z_i < probe_res; z_i++)
+	// 		{
+	// 			project_shader.uniform("probe_xid", x_i);
+	// 			project_shader.uniform("probe_yid", y_i);
+	// 			project_shader.uniform("probe_zid", z_i);
+
+	// 			GLint cubemap_index = (x_i * probe_res + y_i) * probe_res + z_i;
+	// 			glActiveTexture(GL_TEXTURE0+texture_unit);
+	// 			glBindTexture(GL_TEXTURE_CUBE_MAP, probe_radiance[cubemap_index]);
+	// 			project_shader.uniform("environment", texture_unit);
+	// 			// glBindImageTexture(num_sh_tex, probe_radiance[cubemap_index], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
 
 
-				glDispatchCompute(1, 1, 1);
-				// texture_unit++; // it is necessary?
-				// if (texture_unit == 80) {
-				// 	texture_unit = 0;
-				// 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-				// }
-			}
+	// 			glDispatchCompute(1, 1, 1);
+	// 			// texture_unit++; // it is necessary?
+	// 			// if (texture_unit == 70) {
+	// 			// 	texture_unit = 0;
+	// 			// 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	// 			// }
+	// 		}
 }
 
 void SH_volume::bind_sh_tex(Shader& shader)

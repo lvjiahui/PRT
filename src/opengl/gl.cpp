@@ -5,69 +5,71 @@
 #include <fstream>
 #include <sstream>
 #include <sf_libs/stb_image.h>
+#include <sf_libs/Shadinclude.hpp>
 
 
 namespace Shaders {
-    Shader brdfShader;
-    Shader screenShader;
-    Shader envShader;
-    Shader castlightShader;
+    RenderShader brdfShader;
+    RenderShader screenShader;
+    RenderShader envShader;
+    RenderShader castlightShader;
 }
 
-Shader::Shader() {}
 
-Shader::Shader(std::string vertex_code, std::string fragment_code) { load(vertex_code, fragment_code); }
+// Shader::Shader(std::string vertex_code, std::string fragment_code) { create(vertex_code, fragment_code); }
 
-Shader::Shader(fs::path vertex_path, fs::path fragmentPath)
+void Shader::load(std::vector<fs::path> shader_paths)
 {
-    // 1. retrieve the vertex/fragment source code from filePath
-    std::string vertexCode;
-    std::string fragmentCode;
-    std::ifstream vShaderFile;
-    std::ifstream fShaderFile;
-    // ensure ifstream objects can throw exceptions:
-    vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    try
-    {
-        // open files
-        vShaderFile.open(vertex_path);
-        fShaderFile.open(fragmentPath);
-        std::stringstream vShaderStream{}, fShaderStream{};
-        // read file's buffer contents into streams
-        vShaderStream << vShaderFile.rdbuf();
-        fShaderStream << fShaderFile.rdbuf();
-        // close file handlers
-        vShaderFile.close();
-        fShaderFile.close();
-        // convert stream into string
-        vertexCode = vShaderStream.str();
-        fragmentCode = fShaderStream.str();
+
+    for(auto &path : shader_paths){
+        std::string shader_code = Shadinclude::load(path.string(), "#include");
+        shader_codes.push_back(shader_code);
+        //save to shaders/generated/
+        std::ofstream out_file("src/shaders/generated/" + path.filename().string());
+		if (!out_file.is_open())
+		{
+			fmt::print(stderr, "cannot write file to src/shaders/generated/ \n");
+		} else {
+            out_file << shader_code;
+            out_file.close();
+        }
     }
-    catch (std::ifstream::failure& e)
-    {
-        fmt::print("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
+
+    program = glCreateProgram();
+    create_shader();
+    assert(shaders.size() == shader_codes.size());
+
+    for(int i = 0; i < shaders.size(); i++){
+        const GLchar *code_c = shader_codes[i].c_str();
+        glShaderSource(shaders[i], 1, &code_c, NULL);
+        glCompileShader(shaders[i]);
+        if (!check_compiled(shaders[i], code_c)) {
+            destroy();
+            return;
+        }
+        glAttachShader(program, shaders[i]);
     }
-    load(vertexCode, fragmentCode);
+    
+    glLinkProgram(program);
+    if (!check_linked(program)) {
+        destroy();
+        return;
+    }
 }
 
 Shader::Shader(Shader &&src) {
     program = src.program;
     src.program = 0;
-    v = src.v;
-    src.v = 0;
-    f = src.f;
-    src.f = 0;
+    shader_codes = std::move(src.shader_codes);
+    shaders = std::move(src.shaders);
 }
 
 void Shader::operator=(Shader &&src) {
     destroy();
     program = src.program;
     src.program = 0;
-    v = src.v;
-    src.v = 0;
-    f = src.f;
-    src.f = 0;
+    shader_codes = std::move(src.shader_codes);
+    shaders = std::move(src.shaders);
 }
 
 Shader::~Shader() { destroy(); }
@@ -80,10 +82,11 @@ void Shader::destroy() {
         return;
 
     glUseProgram(0);
-    glDeleteShader(v);
-    glDeleteShader(f);
+    for(auto shader : shaders)
+        glDeleteShader(shader);
     glDeleteProgram(program);
-    v = f = program = 0;
+    shader_codes.clear();
+    shaders.clear();
 }
 
 void Shader::uniform_block(std::string name, GLuint i) const {
@@ -117,49 +120,27 @@ void Shader::uniform(std::string name, bool b) const { glUniform1i(loc(name), b)
 
 GLuint Shader::loc(std::string name) const { 
     auto location = glGetUniformLocation(program, name.c_str());
-    assert(location!=-1);
+    if(location == -1){
+        fmt::print("can not locale {}\n", name);
+        assert(false);
+    }
     return location; 
 }
 
-void Shader::load(std::string vertex_code, std::string fragment_code) {
 
-    v = glCreateShader(GL_VERTEX_SHADER);
-    f = glCreateShader(GL_FRAGMENT_SHADER);
-    const GLchar *vs_c = vertex_code.c_str();
-    const GLchar *fs_c = fragment_code.c_str();
-    glShaderSource(v, 1, &vs_c, NULL);
-    glShaderSource(f, 1, &fs_c, NULL);
-    glCompileShader(v);
-    glCompileShader(f);
-
-    if (!validate(v, vs_c)) {
-        destroy();
-        return;
-    }
-    if (!validate(f, fs_c)) {
-        destroy();
-        return;
-    }
-
-    program = glCreateProgram();
-    glAttachShader(program, v);
-    glAttachShader(program, f);
-    glLinkProgram(program);
-}
-
-bool Shader::validate(GLuint program, std::string code) {
+bool Shader::check_compiled(GLuint shader, std::string code) {
 
     GLint compiled = 0;
-    glGetShaderiv(program, GL_COMPILE_STATUS, &compiled);
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
     if (compiled == GL_FALSE) {
 
         GLint len = 0;
-        glGetShaderiv(program, GL_INFO_LOG_LENGTH, &len);
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
 
         GLchar *msg = new GLchar[len];
-        glGetShaderInfoLog(program, len, &len, msg);
+        glGetShaderInfoLog(shader, len, &len, msg);
 
-        warn("Shader %d failed to compile: %s \n %s", program, msg, code.c_str());
+        warn("Shader %d failed to compile: %s \n %s", shader, msg, code.c_str());
         delete[] msg;
 
         return false;
@@ -167,42 +148,7 @@ bool Shader::validate(GLuint program, std::string code) {
     return true;
 }
 
-ComputeShader::ComputeShader(fs::path shader_path) {
-    std::string shaderCode;
-    std::ifstream ShaderFile;
-    // ensure ifstream objects can throw exceptions:
-    ShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-
-    try
-    {
-        ShaderFile.open(shader_path);
-        std::stringstream ShaderStream{};
-        ShaderStream << ShaderFile.rdbuf();
-        ShaderFile.close();
-
-        // convert stream into string
-        shaderCode = ShaderStream.str();
-    }
-    catch (std::ifstream::failure& e)
-    {
-        fmt::print("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
-    }
-
-    shader = glCreateShader(GL_COMPUTE_SHADER);
-    const GLchar *c = shaderCode.c_str();
-    glShaderSource(shader, 1, &c, NULL);
-    glCompileShader(shader);
-
-
-    if (!validate(shader, c)) {
-        destroy();
-        return;
-    }
-
-
-    program = glCreateProgram();
-    glAttachShader(program, shader);
-    glLinkProgram(program);
+bool Shader::check_linked(GLuint program) {
 
     GLint linked = 0;
     glGetProgramiv(program, GL_LINK_STATUS, &linked);
@@ -214,81 +160,21 @@ ComputeShader::ComputeShader(fs::path shader_path) {
         GLchar *msg = new GLchar[len];
         glGetProgramInfoLog(program, len, &len, msg);
 
-        warn("Shader %d failed to link: %s \n %s", program, msg, c);
-        delete[] msg;
-
-        destroy();
-        return;
-    }
-
-}
-
-void ComputeShader::operator=(ComputeShader &&src) {
-    program = src.program;
-    src.program = 0;
-    shader = src.shader;
-    src.shader = 0;
-}
-
-void ComputeShader::uniform(std::string name, int count, const glm::vec2 items[]) const {
-    glUniform2fv(loc(name), count, (GLfloat *)items);
-}
-
-void ComputeShader::uniform(std::string name, int count, const glm::vec3 items[]) const {
-    glUniform3fv(loc(name), count, (GLfloat *)items);
-}
-
-void ComputeShader::uniform(std::string name, GLfloat fl) const { glUniform1f(loc(name), fl); }
-
-void ComputeShader::uniform(std::string name, const glm::mat4 &mat) const {
-    glUniformMatrix4fv(loc(name), 1, GL_FALSE, &mat[0][0]);
-}
-
-void ComputeShader::uniform(std::string name, glm::vec3 vec3) const { glUniform3fv(loc(name), 1, &vec3[0]); }
-
-void ComputeShader::uniform(std::string name, glm::vec2 vec2) const { glUniform2fv(loc(name), 1, &vec2[0]); }
-
-void ComputeShader::uniform(std::string name, GLint i) const { glUniform1i(loc(name), i); }
-
-void ComputeShader::uniform(std::string name, GLuint i) const { glUniform1ui(loc(name), i); }
-
-void ComputeShader::uniform(std::string name, bool b) const { glUniform1i(loc(name), b); }
-
-GLuint ComputeShader::loc(std::string name) const { 
-    auto location = glGetUniformLocation(program, name.c_str());
-    assert(location!=-1);
-    return location; 
-}
-
-ComputeShader::~ComputeShader() { destroy(); }
-
-void ComputeShader::bind() const { glUseProgram(program); }
-
-void ComputeShader::destroy() {
-    glUseProgram(0);
-    glDeleteShader(shader);
-    glDeleteProgram(program);
-    shader = program = 0;
-}
-
-bool ComputeShader::validate(GLuint program, std::string code) {
-
-    GLint compiled = 0;
-    glGetShaderiv(program, GL_COMPILE_STATUS, &compiled);
-    if (compiled == GL_FALSE) {
-
-        GLint len = 0;
-        glGetShaderiv(program, GL_INFO_LOG_LENGTH, &len);
-
-        GLchar *msg = new GLchar[len];
-        glGetShaderInfoLog(program, len, &len, msg);
-
-        warn("Shader %d failed to compile: %s \n %s", program, msg, code.c_str());
+        warn("program %d failed to link: %s \n", program, msg);
         delete[] msg;
 
         return false;
     }
     return true;
+}
+
+void RenderShader::create_shader(){
+    shaders.push_back(glCreateShader(GL_VERTEX_SHADER));
+    shaders.push_back(glCreateShader(GL_FRAGMENT_SHADER));
+}
+
+void ComputeShader::create_shader(){
+    shaders.push_back(glCreateShader(GL_COMPUTE_SHADER));
 }
 
 Mesh::Mesh() { create(); }

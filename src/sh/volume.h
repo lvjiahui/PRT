@@ -16,10 +16,14 @@ public:
     void project_sh();
     void bind_sh_tex(Shader&);
     void bind_sh_tex(ComputeShader& shader);
-    // ComputeShader project_shader{ fs::path{"src/opengl/image_projectSH.comp"} };
-    ComputeShader project_shader{ fs::path{"src/opengl/projectSH.comp"} };
-    ComputeShader relight_shader{ fs::path{"src/opengl/relight.comp"} };
-    Shader gbuffer_shader{ fs::path{"src/opengl/mesh.vert"}, fs::path{"src/opengl/g_buffer.frag"} };
+    // ComputeShader project_shader{ fs::path{"src/shaders/image_projectSH.comp"} };
+    // ComputeShader project_shader{ fs::path{"src/shaders/precomp_projectSH.comp"} };
+    // ComputeShader project_shader{ fs::path{"src/shaders/projectSH.comp"} };
+    // ComputeShader relight_shader{ fs::path{"src/shaders/relight.comp"} };
+    ComputeShader relight_project_shader{ fs::path{"src/shaders/relight_projectSH.comp"} };
+    // ComputeShader relight_project_shader{ fs::path{"src/shaders/precomp_relight_projectSH.comp"} };
+    // ComputeShader precomp_SH_shader{ fs::path{"src/shaders/precomp_SH.comp"} };
+    RenderShader gbuffer_shader{ fs::path{"src/shaders/mesh.vert"}, fs::path{"src/shaders/g_buffer.frag"} };
     SkyBox skybox;
 
     GLsizei probe_res;
@@ -28,6 +32,11 @@ public:
     static const int num_sh_tex = 7;
     GLuint sh_tex[num_sh_tex];
     // GLuint probe_tex;
+    // GLuint precomp_SH0123;
+    // GLuint precomp_SH4567;
+    // GLuint precomp_SH8;
+    GLuint GB_pos_2D;
+    GLuint GB_norm_2D;
     std::vector<GLuint> probe_radiance;
     std::vector<GLuint> probe_GB_pos;
     std::vector<GLuint> probe_GB_norm;
