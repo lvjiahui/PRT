@@ -1,5 +1,6 @@
 #include "volume.h"
 #include "platform/app.h"
+#include "util/util.h"
 #include <iostream>
 
 
@@ -224,6 +225,14 @@ void SH_volume::project_sh()
 	relight_project_shader.uniform("ambient.intensity", 0.f*glm::vec3(1));
 	relight_project_shader.uniform("multi_bounce", app.multi_bounce);
 	relight_project_shader.uniform("atten", app.atten);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, app.sky_shadow.depthMap);
+	relight_project_shader.uniform("shadowMap", 0);
+	relight_project_shader.uniform("lightSpaceMatrix", app.sky_shadow.lightSpaceMatrix);
+	relight_project_shader.uniform("sky.intensity", glm::vec3(app.sky_intensity));
+	relight_project_shader.uniform("sky.direction", app.sky_shadow.direction);
+	//multi bounce
+	bind_sh_tex(relight_project_shader);
 	// SH project
 	for (int i = 0; i < num_sh_tex; i++) {
 		glBindImageTexture(i, sh_tex[i], 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F);
@@ -299,16 +308,6 @@ void SH_volume::bind_sh_tex(Shader& shader)
 	}
 }
 
-void SH_volume::bind_sh_tex(ComputeShader& shader)
-{
-	shader.bind();
-	for (int i = 0; i < num_sh_tex; i++) {
-		int tex_unit = 16 - num_sh_tex + i;
-		glActiveTexture(GL_TEXTURE0 + tex_unit);
-		glBindTexture(GL_TEXTURE_3D, sh_tex[i]);
-		shader.uniform("SH_volume" + std::to_string(i), tex_unit);
-	}
-}
 
 glm::mat4 SH_volume::captureViews(glm::vec3 position, int face){
     static glm::vec3 fronts[6] =

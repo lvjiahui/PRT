@@ -15,7 +15,6 @@ public:
     void print();
     void project_sh();
     void bind_sh_tex(Shader&);
-    void bind_sh_tex(ComputeShader& shader);
     // ComputeShader project_shader{ fs::path{"src/shaders/image_projectSH.comp"} };
     // ComputeShader project_shader{ fs::path{"src/shaders/precomp_projectSH.comp"} };
     // ComputeShader project_shader{ fs::path{"src/shaders/projectSH.comp"} };

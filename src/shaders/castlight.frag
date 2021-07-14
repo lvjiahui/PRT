@@ -3,13 +3,16 @@ out vec4 FragColor;
 
 in vec3 Normal;  
 in vec3 WorldPos;  
+in vec4 FragPosLightSpace;
 
 #include common/light.glsl
 uniform CastLight light;
 uniform PointLight ambient;
+uniform ParalLight sky;
 
 #include common/SH.glsl
 #include colored_wall.glsl
+#include common/paral_shadow.glsl
 
 
 void main()
@@ -17,6 +20,8 @@ void main()
     vec3 rad = vec3(0, 0, 0);
     vec3 N = normalize(Normal);
 
+    float shadow = ShadowCalculation(FragPosLightSpace, sky.direction, N);
+    rad += (1-shadow) * Eval_ParalLight(sky, N);
     rad += Eval_CastLight(light, WorldPos, N);
     rad += Eval_PointLight(ambient, WorldPos, N);
     rad += SH_Irad(vec4(N,1), WorldPos) / PI;

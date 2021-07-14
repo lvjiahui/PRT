@@ -12,6 +12,9 @@
 #include <glm/ext/matrix_clip_space.hpp> // glm::perspective
 #include <glm/ext/scalar_constants.hpp> // glm::pi
 
+
+#define NONCOPYABLE(Type) Type(const Type&)=delete; Type& operator=(const Type&)=delete
+
 namespace fs = std::filesystem;
 
 class RenderShader;
@@ -24,13 +27,12 @@ namespace Shaders {
 
 class Shader {
 public:
+    NONCOPYABLE(Shader);
     Shader() {};
-    Shader(const Shader &src) = delete;
     Shader(Shader &&src);
     ~Shader();
     void load(std::vector<fs::path> shader_paths);
 
-    void operator=(const Shader &src) = delete;
     void operator=(Shader &&src);
 
     void bind() const;
@@ -75,6 +77,7 @@ public:
 
 class Mesh {
 public:
+    NONCOPYABLE(Mesh);
     typedef GLuint Index;
     struct Vert {
         glm::vec3 pos;
@@ -85,11 +88,9 @@ public:
 
     Mesh();
     Mesh(std::vector<Vert> &&vertices, std::vector<Index> &&indices);
-    Mesh(const Mesh &src) = delete;
     Mesh(Mesh &&src);
     ~Mesh();
 
-    void operator=(const Mesh &src) = delete;
     void operator=(Mesh &&src);
 
     void render(Shader& shader);
@@ -118,9 +119,8 @@ private:
 
 class Framebuffer{
 public:
+    NONCOPYABLE(Framebuffer);
     Framebuffer();
-    Framebuffer(const Framebuffer &src) = delete;
-    void operator=(const Framebuffer &src) = delete;
     void bind();
     ~Framebuffer();
 private:
@@ -130,12 +130,12 @@ private:
 
 class Tex2D {
 public:
+    NONCOPYABLE(Tex2D);
     Tex2D() = default;
-    Tex2D(const Tex2D &src) = delete;
     Tex2D(Tex2D &&src);
     ~Tex2D();
 
-    void operator=(const Tex2D &src) = delete;
+
     void operator=(Tex2D &&src);
 
     void imagei(int w, int h, unsigned char *img = nullptr); //source:rgba
@@ -202,6 +202,7 @@ private:
 
 class Quad{
 public:
+    NONCOPYABLE(Quad);
     Quad();
     void render();
 private:
@@ -217,6 +218,7 @@ private:
 
 class SkyBox {
 public:
+    NONCOPYABLE(SkyBox);
     RenderShader skyboxShader = RenderShader{ fs::path{"src/shaders/skybox.vert"}, fs::path{"src/shaders/skybox.frag"} };
     SkyBox();
     void create();
@@ -299,4 +301,24 @@ private:
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
     };
+};
+
+class Model;
+
+class Paral_Shadow{
+public:
+    NONCOPYABLE(Paral_Shadow);
+    Paral_Shadow();
+    ~Paral_Shadow();
+
+    void render(Model&);
+    void set_dir(float, float);
+    RenderShader shadow_depth_shader{ fs::path{"src/shaders/shadow_depth.vert"}, fs::path{"src/shaders/shadow_depth.frag"} };
+    glm::vec3 direction;
+    glm::mat4 lightSpaceMatrix{1};
+    // const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+    const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
+    GLuint depthMap;
+    GLuint depthMapFBO;
+    float near_plane = 0.1, far_plane = 30;
 };

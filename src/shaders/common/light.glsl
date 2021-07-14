@@ -10,6 +10,10 @@ struct PointLight {
     vec3 position;  
 };
 
+struct ParalLight {
+    vec3 intensity; 
+    vec3 direction;
+};
 
 vec3 Eval_CastLight(const CastLight light, const vec3 Pos, const vec3 N){
     // check if lighting is inside the spotlight cone
@@ -34,4 +38,9 @@ vec3 Eval_PointLight(const PointLight light, const vec3 Pos, const vec3 N){
         return radiance;
     }
     return vec3(0,0,0);
+}
+
+vec3 Eval_ParalLight(const ParalLight light, const vec3 N){
+    float incoming_cos = max(dot(light.direction, N),0);
+    return light.intensity * incoming_cos;
 }

@@ -53,6 +53,8 @@ void App::setup(Platform& plt)
 	Shaders::brdfShader.bind();
 	app->brdfLUT.render_to(app->screen_quad);
 
+	app->sky_shadow.set_dir(app->sky_light_pos[0], app->sky_light_pos[1]);
+	app->sky_shadow.render(*app->scene);
 }
 
 App& App::get()
@@ -133,6 +135,11 @@ void App::render_imgui()
 	ImGui::SliderFloat("intensity", &cast_light_intensity, 0, 300);
 	ImGui::SliderFloat("cutoff", &cast_light_cut_off, 0, 1);
 
+	if(ImGui::DragFloat2("sky_light_pos", sky_light_pos, 0.01, 0, 1)){
+		sky_shadow.set_dir(sky_light_pos[0], sky_light_pos[1]);
+		sky_shadow.render(*scene);
+	}
+	ImGui::SliderFloat("sky_intensity", &sky_intensity, 0, 1);
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 	ImGui::End();
@@ -161,6 +168,14 @@ void App::render_3d()
 			Shaders::castlightShader.uniform("light.cutOff", cast_light_cut_off);
 			Shaders::castlightShader.uniform("ambient.position", glm::vec3(0,0,0));
 			Shaders::castlightShader.uniform("ambient.intensity", 0.f*glm::vec3(1));
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, sky_shadow.depthMap);
+			Shaders::castlightShader.uniform("shadowMap", 0);
+			Shaders::castlightShader.uniform("lightSpaceMatrix", sky_shadow.lightSpaceMatrix);
+			Shaders::castlightShader.uniform("sky.intensity", glm::vec3(sky_intensity));
+			Shaders::castlightShader.uniform("sky.direction", sky_shadow.direction);
+
 		};
 		set_shader();
 		scene->render(Shaders::castlightShader);
