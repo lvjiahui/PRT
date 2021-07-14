@@ -75,7 +75,7 @@ void main()
     const vec3 worldpos = cubepos.zxy; // openGL to directX
     const vec3 N = normalize(worldpos);
     float fTmp = dot(worldpos, worldpos);
-    float fWt = sqrt(fTmp)*fTmp;
+    float fWt = 1/(sqrt(fTmp)*fTmp);
 
     imageStore(precomp_SH0123, imageCoord, fWt * vec4(SH00(N), SH1n1(N), SH10(N), SH1p1(N)));
     imageStore(precomp_SH4567, imageCoord, fWt * vec4(SH2n2(N), SH2n1(N), SH20(N), SH2p1(N)));

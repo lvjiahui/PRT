@@ -100,7 +100,7 @@ void main()
             vec3 cubepos = texel_pos - probe_pos;
             cubepos = cubepos / max3(abs(cubepos));
             float fTmp = dot(cubepos, cubepos);
-            float fWt = sqrt(fTmp)*fTmp; //solid angle
+            float fWt = 1/(sqrt(fTmp)*fTmp); //solid angle
             const vec3 d = normalize(cubepos).zxy; // openGL to directX
 
             // relight

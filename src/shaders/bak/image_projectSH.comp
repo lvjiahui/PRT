@@ -91,7 +91,7 @@ void main()
           const vec3 worldpos = pos.zxy; // openGL to directX
           const vec3 N = normalize(worldpos);
           float fTmp = dot(worldpos, worldpos);
-          float fWt = sqrt(fTmp)*fTmp;
+          float fWt = 1/(sqrt(fTmp)*fTmp);
           // vec3 radiance = imageLoad(environment, cubeCoord).rgb;
           vec3 radiance = texture(environment, pos).rgb;
           radiance = fWt * radiance;

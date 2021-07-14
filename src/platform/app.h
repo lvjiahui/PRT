@@ -29,8 +29,8 @@ public:
 	Platform& plt;
 	SH_volume sh_volume{ 8 };
 	std::unique_ptr<Model> light_mesh;
-	bool multi_bounce = false;
-	float atten = 0.1;
+	bool multi_bounce = true;
+	float atten = 1;
 	float cast_light_intensity = 100;
 	float cast_light_cut_off = 0.9;
 	float cast_light_position[3] = {4, 0, 0};

@@ -36,11 +36,6 @@ void App::setup(Platform& plt)
 	cubeMap["environment"].generateMipmap();
 
 	app->sh_volume.bake();
-	app->sh_volume.relight();
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-	app->sh_volume.project_sh();
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-	app->sh_volume.print();
 
 
 	cubeMap.insert({"irradiance", CubeMap{32, 32}});
@@ -127,8 +122,10 @@ void App::render_imgui()
 	// ImGui::ListBox("skybox", &map_current, map_choices.data(), map_choices.size());
 
 	ImGui::Separator();
+	if(ImGui::Button("print SH")){
+		sh_volume.print();
+	}
 	ImGui::Checkbox("multi_bounce", &multi_bounce);
-	ImGui::SameLine();
 	ImGui::SliderFloat("atten", &atten, 0, 1);
 	ImGui::Checkbox("render SH probe", &render_SH_probe);
 	ImGui::DragFloat3("light position", cast_light_position, 0.05, -5, 5);
@@ -139,7 +136,7 @@ void App::render_imgui()
 		sky_shadow.set_dir(sky_light_pos[0], sky_light_pos[1]);
 		sky_shadow.render(*scene);
 	}
-	ImGui::SliderFloat("sky_intensity", &sky_intensity, 0, 1);
+	ImGui::SliderFloat("sky_intensity", &sky_intensity, 0, 10);
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 	ImGui::End();
