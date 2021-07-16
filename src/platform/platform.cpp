@@ -171,6 +171,7 @@ Platform::Platform() {
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);  
+	glDisable(GL_DITHER); //TODO: is it necessary?
 
 	printf("opengl version: %s\n", glGetString(GL_VERSION));
 	// int size;

@@ -11,15 +11,16 @@ public:
     void operator=(const SH_volume&) = delete;
     ~SH_volume();
     void bake();
+    void precompute();
     void relight();
     void print();
     void project_sh();
     void bind_sh_tex(Shader&);
     // ComputeShader project_shader{ fs::path{"src/shaders/image_projectSH.comp"} };
-    // ComputeShader project_shader{ fs::path{"src/shaders/precomp_projectSH.comp"} };
+    ComputeShader project_shader{ fs::path{"src/shaders/precomp_projectSH.comp"} };
     // ComputeShader project_shader{ fs::path{"src/shaders/projectSH.comp"} };
-    // ComputeShader relight_shader{ fs::path{"src/shaders/relight.comp"} };
-    ComputeShader relight_project_shader{ fs::path{"src/shaders/relight_projectSH.comp"} };
+    ComputeShader relight_shader{ fs::path{"src/shaders/relight.comp"} };
+    // ComputeShader relight_project_shader{ fs::path{"src/shaders/relight_projectSH.comp"} };
     // ComputeShader relight_project_shader{ fs::path{"src/shaders/precomp_relight_projectSH.comp"} };
     // ComputeShader precomp_SH_shader{ fs::path{"src/shaders/precomp_SH.comp"} };
     RenderShader gbuffer_shader{ fs::path{"src/shaders/mesh.vert"}, fs::path{"src/shaders/g_buffer.frag"} };
@@ -30,15 +31,16 @@ public:
     float scene_size = 6;
     static const int num_sh_tex = 7;
     GLuint sh_tex[num_sh_tex];
-    // GLuint probe_tex;
-    // GLuint precomp_SH0123;
-    // GLuint precomp_SH4567;
-    // GLuint precomp_SH8;
-    GLuint GB_pos_2D;
-    GLuint GB_norm_2D;
-    std::vector<GLuint> probe_radiance;
+    GLuint transfer_buffer, transfer_tex;
+    GLuint rad_buffer, rad_tex;
+    GLuint ID_buffer, ID_tex;
+    GLuint probe_range;
+    GLuint primitive_buffer, primitive_tex;
+    int num_primitive;
+
     std::vector<GLuint> probe_GB_pos;
     std::vector<GLuint> probe_GB_norm;
+    std::vector<GLuint> probe_GB_ID;
     std::vector<glm::vec3> world_position;
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.01f, 100.0f);
     

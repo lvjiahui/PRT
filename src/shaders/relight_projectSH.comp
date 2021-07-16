@@ -91,6 +91,17 @@ void main()
     for(int i = 0; i < NUM_COEFF; i++)
         tex_irradiance[i][tex_V] = vec4(0,0,0,1);
 
+    vec3 sh0 = vec3(0);
+    vec3 sh1 = vec3(0);
+    vec3 sh2 = vec3(0);
+    vec3 sh3 = vec3(0);
+#ifdef THIRD_BAND
+    vec3 sh4 = vec3(0);
+    vec3 sh5 = vec3(0);
+    vec3 sh6 = vec3(0);
+    vec3 sh7 = vec3(0);
+    vec3 sh8 = vec3(0);
+#endif
     for (int face = 0; face < 6; face++){
         const ivec2 texStart = ivec2(SIZE * 6 * probe_xid + SIZE * face, gl_GlobalInvocationID.y);
         for(int tex_U = 0; tex_U < SIZE; tex_U++){
@@ -114,22 +125,33 @@ void main()
             }
             vec3 albedo = get_albedo(texel_pos);
             rad *= albedo;
-
             // project
             rad = fWt * rad;
-            tex_irradiance[0][tex_V].rgb += rad * SH00(d) ;
-            tex_irradiance[1][tex_V].rgb += rad * SH1n1(d);
-            tex_irradiance[2][tex_V].rgb += rad * SH10(d) ;
-            tex_irradiance[3][tex_V].rgb += rad * SH1p1(d);
+            sh0 += rad * SH00(d) ;
+            sh1 += rad * SH1n1(d);
+            sh2 += rad * SH10(d) ;
+            sh3 += rad * SH1p1(d);
 #ifdef THIRD_BAND
-            tex_irradiance[4][tex_V].rgb += rad * SH2n2(d);
-            tex_irradiance[5][tex_V].rgb += rad * SH2n1(d);
-            tex_irradiance[6][tex_V].rgb += rad * SH20(d) ;
-            tex_irradiance[7][tex_V].rgb += rad * SH2p1(d);
-            tex_irradiance[8][tex_V].rgb += rad * SH2p2(d);
+            sh4 += rad * SH2n2(d);
+            sh5 += rad * SH2n1(d);
+            sh6 += rad * SH20(d) ;
+            sh7 += rad * SH2p1(d);
+            sh8 += rad * SH2p2(d);
 #endif
         }
     }
+    tex_irradiance[0][tex_V].rgb = sh0;
+    tex_irradiance[1][tex_V].rgb = sh1;
+    tex_irradiance[2][tex_V].rgb = sh2;
+    tex_irradiance[3][tex_V].rgb = sh3;
+#ifdef THIRD_BAND
+    tex_irradiance[4][tex_V].rgb = sh4;
+    tex_irradiance[5][tex_V].rgb = sh5;
+    tex_irradiance[6][tex_V].rgb = sh6;
+    tex_irradiance[7][tex_V].rgb = sh7;
+    tex_irradiance[8][tex_V].rgb = sh8;
+#endif
+
 
 
     barrier();
