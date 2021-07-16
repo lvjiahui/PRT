@@ -26,22 +26,24 @@ public:
     RenderShader gbuffer_shader{ fs::path{"src/shaders/mesh.vert"}, fs::path{"src/shaders/g_buffer.frag"} };
     SkyBox skybox;
 
-    GLsizei probe_res;
-    static const GLsizei cubemap_res = 64;
     float scene_size = 6;
+    GLsizei probe_res;
+    // per probe data
     static const int num_sh_tex = 7;
-    GLuint sh_tex[num_sh_tex];
+    GLuint sh_tex[num_sh_tex]; //3D texture
+    GLuint probe_range; //3D texture
+    std::vector<glm::vec3> world_position;
+    // buffer
     GLuint transfer_buffer, transfer_tex;
     GLuint rad_buffer, rad_tex;
     GLuint ID_buffer, ID_tex;
-    GLuint probe_range;
     GLuint primitive_buffer, primitive_tex;
     int num_primitive;
-
-    std::vector<GLuint> probe_GB_pos;
-    std::vector<GLuint> probe_GB_norm;
-    std::vector<GLuint> probe_GB_ID;
-    std::vector<glm::vec3> world_position;
+    // cubemap
+    static const GLsizei cubemap_res = 64;
+    GLuint GBuffer_pos;
+    GLuint GBuffer_norm;
+    GLuint GBuffer_ID;
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.01f, 100.0f);
     
     glm::mat4 captureViews(glm::vec3 position, int face);

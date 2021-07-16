@@ -25,6 +25,7 @@ uniform ParalLight sky;
 #include common/SH.glsl
 uniform bool multi_bounce;
 uniform float atten;
+const float sh_shift = 0;
 
 #include colored_wall.glsl
 #include common/paral_shadow.glsl
@@ -59,7 +60,7 @@ void main()
                 + Eval_PointLight(ambient, pos, N)
                 );
             if(multi_bounce){
-                rad += albedo * atten * SH_Irad(vec4(N,1), pos) / PI;
+                rad += albedo * atten * SH_Irad(vec4(N,1), pos + sh_shift*N) / PI;
             }
         }
         rad /= NUM_SAMPLE;

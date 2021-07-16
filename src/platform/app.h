@@ -62,8 +62,8 @@ public:
 	std::unique_ptr<Model> scene;
 	std::unique_ptr<Model> probe_mesh;
 	Paral_Shadow sky_shadow;
-	float sky_light_pos[2] = {0.38, 0.84};
-	float sky_intensity = 1;
+	float sky_light_pos[2] = {0.17, 0.84};
+	float sky_intensity = 5;
 
 	int max_path_length = 2;
 	int sh_resolution = 32;

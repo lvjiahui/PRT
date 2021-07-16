@@ -32,17 +32,17 @@ void App::setup(Platform& plt)
 	app->hdr_RectMap = load_hdr(path);
 
 	cubeMap.insert({"environment", CubeMap{512, 512}});
-	lightProbe->equirectangular_to_cubemap(app->hdr_RectMap, cubeMap["environment"]);
-	cubeMap["environment"].generateMipmap();
+	// lightProbe->equirectangular_to_cubemap(app->hdr_RectMap, cubeMap["environment"]);
+	// cubeMap["environment"].generateMipmap();
 
 	app->sh_volume.bake();
 
 
 	cubeMap.insert({"irradiance", CubeMap{32, 32}});
-	lightProbe->irradiance(cubeMap["irradiance"]);
+	// lightProbe->irradiance(cubeMap["irradiance"]);
 
 	cubeMap.insert({"prefilter", CubeMap{256, 256, true}});
-	lightProbe->prefilter(cubeMap["prefilter"]);
+	// lightProbe->prefilter(cubeMap["prefilter"]);
 
 	app->brdfLUT.imagef(512, 512);
 	Shaders::brdfShader.bind();
@@ -172,6 +172,7 @@ void App::render_3d()
 			Shaders::castlightShader.uniform("lightSpaceMatrix", sky_shadow.lightSpaceMatrix);
 			Shaders::castlightShader.uniform("sky.intensity", glm::vec3(sky_intensity));
 			Shaders::castlightShader.uniform("sky.direction", sky_shadow.direction);
+			Shaders::castlightShader.uniform("sh", sh);
 
 		};
 		set_shader();

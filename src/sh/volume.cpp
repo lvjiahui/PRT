@@ -23,29 +23,25 @@ SH_volume::SH_volume(GLsizei _probe_res) : probe_res(_probe_res)
 	}
 
 	// probe 
-	int num_probe = probe_res * probe_res * probe_res;
-	probe_GB_norm.resize(num_probe);
-	probe_GB_pos.resize(num_probe);
-	probe_GB_ID.resize(num_probe);
-	glGenTextures(num_probe, probe_GB_ID.data());
-	glGenTextures(num_probe, probe_GB_norm.data());
-	glGenTextures(num_probe, probe_GB_pos.data());
-	for (int i = 0; i < num_probe; i++) {
-		glBindTexture(GL_TEXTURE_CUBE_MAP, probe_GB_norm[i]);
-		glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA16F, cubemap_res, cubemap_res);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-		glBindTexture(GL_TEXTURE_CUBE_MAP, probe_GB_pos[i]);
-		glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA16F, cubemap_res, cubemap_res);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenTextures(1, &GBuffer_norm);
+	glGenTextures(1, &GBuffer_pos);
+	glGenTextures(1, &GBuffer_ID);
 
-		glBindTexture(GL_TEXTURE_CUBE_MAP, probe_GB_ID[i]);
-		glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_R32F, cubemap_res, cubemap_res); //GL_R32I does not work, why??????
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	}
+	glBindTexture(GL_TEXTURE_CUBE_MAP, GBuffer_norm);
+	glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA16F, cubemap_res, cubemap_res);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glBindTexture(GL_TEXTURE_CUBE_MAP, GBuffer_pos);
+	glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA16F, cubemap_res, cubemap_res);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glBindTexture(GL_TEXTURE_CUBE_MAP, GBuffer_ID);
+	glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_R32F, cubemap_res, cubemap_res); //GL_R32I does not work, why??????
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	
 	// float ds = 2*scene_size / (probe_res-1);
@@ -105,27 +101,33 @@ SH_volume::~SH_volume()
 
 void SH_volume::bake()
 {
-	GLint m_viewport[4];
-	glGetIntegerv(GL_VIEWPORT, m_viewport);
-	glViewport(0, 0, cubemap_res, cubemap_res);
-	auto& app = App::get();
-	gbuffer_shader.bind();
-	gbuffer_shader.uniform("model", glm::mat4(1));
-	gbuffer_shader.uniform("projection", captureProjection);
+	// precomputed SH and solid angle
+	precompute();
 
-	app.captureFB.bind(); //glBindFramebuffer
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cubemap_res, cubemap_res);
+}
 
 
-	int num_probe = probe_res * probe_res * probe_res;
-	for (int i = 0; i < num_probe; i++) {
-		glm::vec3 pos = world_position[i];
+void SH_volume::precompute(){
+
+	auto capture_GBuffer = [this](glm::vec3 pos){
+		GLint m_viewport[4];
+		glGetIntegerv(GL_VIEWPORT, m_viewport);
+		glViewport(0, 0, cubemap_res, cubemap_res);
+		auto& app = App::get();
+		gbuffer_shader.bind();
+		gbuffer_shader.uniform("model", glm::mat4(1));
+		gbuffer_shader.uniform("projection", captureProjection);
+
+		app.captureFB.bind(); //glBindFramebuffer
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cubemap_res, cubemap_res);
+
+
 		// fmt::print("probe_pos: {} {} {}\n", pos[0], pos[1], pos[2]);
 		for (int face = 0; face < 6; face++)
 		{
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, probe_GB_pos[i], 0);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, probe_GB_norm[i], 0);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, probe_GB_ID[i], 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, GBuffer_pos, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, GBuffer_norm, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, GBuffer_ID, 0);
 			GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
     		glDrawBuffers(3, attachments);
 			if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
@@ -134,37 +136,41 @@ void SH_volume::bake()
 			gbuffer_shader.uniform("view", captureViews(pos, face));
 			app.scene->render(gbuffer_shader);
 		}
-	}
+	
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+	};
 
-	// precomputed SH and solid angle
-	precompute();
-
-}
-
-
-void SH_volume::precompute(){
 	std::vector<SH9> precomputed_transfer;
 	std::vector<GLuint> precomputed_ID;
 	std::vector<glm::uvec2> range;
 	num_primitive = 0;
 
+	fmt::print("Baking ..........\n");
+
+
 	int num_probe = probe_res * probe_res * probe_res;
 	for (int i = 0; i < num_probe; i++) {
+		glm::vec3 probe_pos = world_position[i];
+		capture_GBuffer(probe_pos);
 		float sum = 0;
 		std::map<GLuint, SH9> transfer_weight;
 		for (int face = 0; face < 6; face++)
 		{
 			std::vector<GLfloat> ID_cpu(cubemap_res * cubemap_res, 0);
-			glBindTexture(GL_TEXTURE_CUBE_MAP, probe_GB_ID[i]);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, GBuffer_ID);
 			glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X+face, 0, GL_RED, GL_FLOAT, ID_cpu.data());
-			std::vector<glm::vec3> pos_cpu(cubemap_res * cubemap_res, glm::vec3(1, 0, 0));
-			glBindTexture(GL_TEXTURE_CUBE_MAP, probe_GB_pos[i]);
+			std::vector<glm::vec3> pos_cpu(cubemap_res * cubemap_res, glm::vec3(0, 0, 0));
+			glBindTexture(GL_TEXTURE_CUBE_MAP, GBuffer_pos);
 			glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X+face, 0, GL_RGB, GL_FLOAT, pos_cpu.data());
+			std::vector<glm::vec3> normal_cpu(cubemap_res * cubemap_res, glm::vec3(0, 0, 0));
+			glBindTexture(GL_TEXTURE_CUBE_MAP, GBuffer_norm);
+			glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_RGB, GL_FLOAT, normal_cpu.data());
 			for (int tex = 0; tex < ID_cpu.size(); tex++) {
-				glm::vec3 tex_pos = pos_cpu[tex] - world_position[i];
+				if (glm::length(normal_cpu[tex]) < 0.1)
+					continue; //TODO: sky visibility?
+				glm::vec3 tex_pos = pos_cpu[tex] - probe_pos;
 				glm::vec3 cube_coord = tex_pos / std::max({std::abs(tex_pos.x), std::abs(tex_pos.y), std::abs(tex_pos.z)});
 				float weight = glm::dot(cube_coord, cube_coord);
 				weight *= std::sqrt(weight);
@@ -226,12 +232,6 @@ void SH_volume::print()
 {
 	int num_probe = probe_res * probe_res * probe_res;
 
-	for (int i = 0; i < num_probe; i++) {
-		std::vector<glm::vec4> probe_GB(cubemap_res * cubemap_res, glm::vec4(0.5, 0.5, 0.5, 0.5));
-		glBindTexture(GL_TEXTURE_CUBE_MAP, probe_GB_norm[i]);
-		glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_RGBA, GL_FLOAT, probe_GB.data());
-		fmt::print("probe_GB norm: {} {} {} {}\n", probe_GB[0][0], probe_GB[0][1], probe_GB[0][2], probe_GB[0][3]);
-	}
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 	for (int sh_i = 0; sh_i < num_sh_tex; sh_i++) {
@@ -243,12 +243,6 @@ void SH_volume::print()
 		}
 	}
 
-	for (int i = 0; i < num_probe; i++) {
-		std::vector<float> ID_cpu(cubemap_res * cubemap_res, 0);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, probe_GB_ID[i]);
-		glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_RED, GL_FLOAT, ID_cpu.data());
-		fmt::print("primitive ID: {} {} {} {}\n", ID_cpu[0], ID_cpu[64], ID_cpu[128], ID_cpu[256]);
-	}
 }
 
 inline float random() {
@@ -347,7 +341,7 @@ void SH_volume::project_sh()
 	project_shader.uniform("range_ID", texture_unit);
 	texture_unit++;
 
-	glDispatchCompute(probe_res, probe_res, probe_res);
+	glDispatchCompute(probe_res/4, probe_res/4, probe_res/4);
 }
 
 void SH_volume::bind_sh_tex(Shader& shader)

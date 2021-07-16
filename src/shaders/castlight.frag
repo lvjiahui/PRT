@@ -11,6 +11,9 @@ uniform PointLight ambient;
 uniform ParalLight sky;
 
 #include common/SH.glsl
+uniform bool sh;
+const float sh_shift = 0;
+
 #include colored_wall.glsl
 #include common/paral_shadow.glsl
 
@@ -24,7 +27,8 @@ void main()
     rad += (1-shadow) * Eval_ParalLight(sky, N);
     rad += Eval_CastLight(light, WorldPos, N);
     rad += Eval_PointLight(ambient, WorldPos, N);
-    rad += SH_Irad(vec4(N,1), WorldPos) / PI;
+    if(sh)
+        rad += SH_Irad(vec4(N,1), WorldPos + sh_shift*N) / PI;
 
     vec3 albedo = get_albedo(WorldPos);
 
