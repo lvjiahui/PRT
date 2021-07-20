@@ -8,7 +8,7 @@ float rand(float n){
     return fract(sin(n) * 43758.5453123);
 }
 
-const float temp_weight = 0.05;
+const float temp_weight = 0.1;
 uniform samplerBuffer primitive_vert;
 layout (rgba32f, binding = 0) uniform imageBuffer radiance;
 uniform float seed_u;

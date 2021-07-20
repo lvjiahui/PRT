@@ -1,5 +1,7 @@
 #version 430 core
 
+#define Thread_Size 128
+
 #define THIRD_BAND
 
 #ifdef THIRD_BAND
@@ -8,11 +10,13 @@
 #define NUM_COEFF 4
 #endif
 
-layout(local_size_x = 4, local_size_y=4, local_size_z=4) in;
+
+layout(local_size_x = Thread_Size) in;
 uniform samplerBuffer radiance;
 uniform samplerBuffer transfer;
 uniform usamplerBuffer range_ID;
 uniform usampler3D probe_range;
+shared vec3 surfel_SH[NUM_COEFF][Thread_Size];
 
 
 const float PI = 3.14159265359;
@@ -28,48 +32,85 @@ layout (rgba16f, binding = 6) restrict writeonly uniform image3D SH_C;
 void main()
 {
 
-    const ivec3 probe_id = ivec3(gl_GlobalInvocationID);
-    ivec2 range = ivec2(texelFetch(probe_range, probe_id, 0).xy);
+    const ivec3 probe_id = ivec3(gl_WorkGroupID);
+    const int thread_ID = int(gl_LocalInvocationID.x);
+    const ivec2 range = ivec2(texelFetch(probe_range, probe_id, 0).xy);
 
-        vec3 SH0 = vec3(0);
-        vec3 SH1 = vec3(0);
-        vec3 SH2 = vec3(0);
-        vec3 SH3 = vec3(0);
+    vec3 SH0 = vec3(0);
+    vec3 SH1 = vec3(0);
+    vec3 SH2 = vec3(0);
+    vec3 SH3 = vec3(0);
 #ifdef THIRD_BAND
-        vec3 SH4 = vec3(0);
-        vec3 SH5 = vec3(0);
-        vec3 SH6 = vec3(0);
-        vec3 SH7 = vec3(0);
-        vec3 SH8 = vec3(0);
+    vec3 SH4 = vec3(0);
+    vec3 SH5 = vec3(0);
+    vec3 SH6 = vec3(0);
+    vec3 SH7 = vec3(0);
+    vec3 SH8 = vec3(0);
 #endif
-    for (int i = range.x; i < range.y; i++){
-            const int ID = int(texelFetch(range_ID, i).x);
-            vec3 rad = texelFetch(radiance, ID).rgb;
-            SH0 += texelFetch(transfer, 9 * i + 0).x * rad; // should be consistent with precomputed data
-            SH1 += texelFetch(transfer, 9 * i + 1).x * rad;
-            SH2 += texelFetch(transfer, 9 * i + 2).x * rad;
-            SH3 += texelFetch(transfer, 9 * i + 3).x * rad;
+
+	int i = range.x + thread_ID;
+    while(i < range.y){
+        const int ID = int(texelFetch(range_ID, i).x);
+        vec3 rad = texelFetch(radiance, ID).rgb;
+        SH0 += texelFetch(transfer, 9 * i + 0).x * rad; // should be consistent with precomputed data
+        SH1 += texelFetch(transfer, 9 * i + 1).x * rad;
+        SH2 += texelFetch(transfer, 9 * i + 2).x * rad;
+        SH3 += texelFetch(transfer, 9 * i + 3).x * rad;
 #ifdef THIRD_BAND
-            SH4 += texelFetch(transfer, 9 * i + 4).x * rad;
-            SH5 += texelFetch(transfer, 9 * i + 5).x * rad;
-            SH6 += texelFetch(transfer, 9 * i + 6).x * rad;
-            SH7 += texelFetch(transfer, 9 * i + 7).x * rad;
-            SH8 += texelFetch(transfer, 9 * i + 8).x * rad;
+        SH4 += texelFetch(transfer, 9 * i + 4).x * rad;
+        SH5 += texelFetch(transfer, 9 * i + 5).x * rad;
+        SH6 += texelFetch(transfer, 9 * i + 6).x * rad;
+        SH7 += texelFetch(transfer, 9 * i + 7).x * rad;
+        SH8 += texelFetch(transfer, 9 * i + 8).x * rad;
 #endif
+		i += Thread_Size;
+    }
+
+    surfel_SH[0][thread_ID] = SH0;
+    surfel_SH[1][thread_ID] = SH1;
+    surfel_SH[2][thread_ID] = SH2;
+    surfel_SH[3][thread_ID] = SH3;
+#ifdef THIRD_BAND
+    surfel_SH[4][thread_ID] = SH4;
+    surfel_SH[5][thread_ID] = SH5;
+    surfel_SH[6][thread_ID] = SH6;
+    surfel_SH[7][thread_ID] = SH7;
+    surfel_SH[8][thread_ID] = SH8;
+#endif
+    barrier();
+
+	//reduce
+    for (uint s = Thread_Size/2; s>0; s>>=1) {
+        if (thread_ID < s) {
+            surfel_SH[0][thread_ID] += surfel_SH[0][thread_ID + s];
+            surfel_SH[1][thread_ID] += surfel_SH[1][thread_ID + s];
+            surfel_SH[2][thread_ID] += surfel_SH[2][thread_ID + s];
+            surfel_SH[3][thread_ID] += surfel_SH[3][thread_ID + s];
+#ifdef THIRD_BAND
+            surfel_SH[4][thread_ID] += surfel_SH[4][thread_ID + s];
+            surfel_SH[5][thread_ID] += surfel_SH[5][thread_ID + s];
+            surfel_SH[6][thread_ID] += surfel_SH[6][thread_ID + s];
+            surfel_SH[7][thread_ID] += surfel_SH[7][thread_ID + s];
+            surfel_SH[8][thread_ID] += surfel_SH[8][thread_ID + s];
+#endif
+        }
+        barrier();
     }
 
 
+    if(thread_ID == 0){
+
         //windowing ?
-        const vec3 L00 = SH0;
-        const vec3 L1n1= SH1 * 3.f/PI*sin(PI/3)    ;
-        const vec3 L10 = SH2 * 3.f/PI*sin(PI/3)    ;
-        const vec3 L1p1= SH3 * 3.f/PI*sin(PI/3)    ;
+        const vec3 L00 = surfel_SH[0][0];
+        const vec3 L1n1= surfel_SH[1][0] * 3.f/PI*sin(PI/3)    ;
+        const vec3 L10 = surfel_SH[2][0] * 3.f/PI*sin(PI/3)    ;
+        const vec3 L1p1= surfel_SH[3][0] * 3.f/PI*sin(PI/3)    ;
 #ifdef THIRD_BAND
-        const vec3 L2n2= SH4 * 3.f/2/PI*sin(2*PI/3);
-        const vec3 L2n1= SH5 * 3.f/2/PI*sin(2*PI/3);
-        const vec3 L20 = SH6 * 3.f/2/PI*sin(2*PI/3);
-        const vec3 L2p1= SH7 * 3.f/2/PI*sin(2*PI/3);
-        const vec3 L2p2= SH8 * 3.f/2/PI*sin(2*PI/3);
+        const vec3 L2n2= surfel_SH[4][0] * 3.f/2/PI*sin(2*PI/3);
+        const vec3 L2n1= surfel_SH[5][0] * 3.f/2/PI*sin(2*PI/3);
+        const vec3 L20 = surfel_SH[6][0] * 3.f/2/PI*sin(2*PI/3);
+        const vec3 L2p1= surfel_SH[7][0] * 3.f/2/PI*sin(2*PI/3);
+        const vec3 L2p2= surfel_SH[8][0] * 3.f/2/PI*sin(2*PI/3);
 #endif
 
     // output
@@ -98,5 +139,5 @@ void main()
         imageStore(SH_C, probe_id, vec4(c1*L2p2, 1));
 #endif
 
-    
+	}
 }

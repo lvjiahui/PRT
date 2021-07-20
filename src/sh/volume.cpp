@@ -341,7 +341,7 @@ void SH_volume::project_sh()
 	project_shader.uniform("range_ID", texture_unit);
 	texture_unit++;
 
-	glDispatchCompute(probe_res/4, probe_res/4, probe_res/4);
+	glDispatchCompute(probe_res, probe_res, probe_res);
 }
 
 void SH_volume::bind_sh_tex(Shader& shader)
