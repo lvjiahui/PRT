@@ -320,5 +320,5 @@ public:
     const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
     GLuint depthMap;
     GLuint depthMapFBO;
-    float near_plane = 0.1, far_plane = 30;
+    float near_plane = 0.1, far_plane = 100;
 };

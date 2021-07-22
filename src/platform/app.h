@@ -27,7 +27,8 @@ public:
 	void render();
 
 	Platform& plt;
-	SH_volume sh_volume{ 8 };
+	SH_volume sh_volume{};
+	float sh_shift = 0;
 	std::unique_ptr<Model> light_mesh;
 	bool multi_bounce = true;
 	float atten = 1;

@@ -626,10 +626,10 @@ void Paral_Shadow::set_dir(float up, float dir){
     float theta = PI * up;
 	float phi = 2*PI * dir;
     direction = glm::vec3(sin(theta) * sin(phi), cos(theta), sin(theta) * cos(phi));
-    auto lightProjection = glm::ortho(-15.0f, 15.0f, -15.0f, 15.0f, near_plane, far_plane);
+    auto lightProjection = glm::ortho(-30.0f, 30.0f, -30.0f, 30.0f, near_plane, far_plane);
     glm::vec3 up_vec = glm::vec3(0.0, 1.0, 0.0);
     if (up < 0.1 || up > 0.9) up_vec = glm::vec3(0.0, 0.0, 1.0);
-    auto lightView = glm::lookAt(15.f*direction, glm::vec3(0.0f), up_vec);
+    auto lightView = glm::lookAt(50.f*direction, glm::vec3(0.0f), up_vec);
     lightSpaceMatrix = lightProjection * lightView;
 }
 

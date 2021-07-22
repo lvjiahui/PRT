@@ -6,16 +6,18 @@
 
 class SH_volume {
 public:
-    SH_volume(GLsizei probe_res);
+    SH_volume() {};
     SH_volume(const SH_volume&) = delete;
     void operator=(const SH_volume&) = delete;
     ~SH_volume();
+    void init (GLsizei, glm::vec3);
     void bake();
     void precompute();
     void relight();
     void print();
     void project_sh();
     void bind_sh_tex(Shader&);
+    void set_volume_filter(int FILTER);
     // ComputeShader project_shader{ fs::path{"src/shaders/image_projectSH.comp"} };
     ComputeShader project_shader{ fs::path{"src/shaders/precomp_projectSH.comp"} };
     // ComputeShader project_shader{ fs::path{"src/shaders/projectSH.comp"} };
@@ -26,7 +28,7 @@ public:
     RenderShader gbuffer_shader{ fs::path{"src/shaders/mesh.vert"}, fs::path{"src/shaders/g_buffer.frag"} };
     SkyBox skybox;
 
-    float scene_size = 6;
+    glm::vec3 scene_size;
     GLsizei probe_res;
     // per probe data
     static const int num_sh_tex = 7;

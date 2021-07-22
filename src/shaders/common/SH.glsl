@@ -8,7 +8,7 @@ uniform sampler3D SH_volume6; //C
 
 const float PI = 3.14159265359;
 
-const float scene_size = 6;
+uniform vec3 scene_size;
 
 float min3(vec3 v) {
   return min (min (v.x, v.y), v.z);

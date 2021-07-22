@@ -12,7 +12,7 @@ uniform ParalLight sky;
 
 #include common/SH.glsl
 uniform bool sh;
-const float sh_shift = 0;
+uniform float sh_shift;
 
 #include colored_wall.glsl
 #include common/paral_shadow.glsl
