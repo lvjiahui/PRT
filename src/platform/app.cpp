@@ -4,13 +4,21 @@
 #include <iostream>
 #include <sf_libs/stb_image.h>
 
+namespace Shaders {
+    RenderShader brdfShader;
+    RenderShader screenShader;
+    RenderShader envShader;
+    RenderShader castlightShader;
+    RenderShader segmentShader;
+} // namespace Shaders
+
 App::App(Platform& plt)
 	: plt(plt) {
 	pixels.resize(plt.SCR_WIDTH * plt.SCR_HEIGHT);
 	pixels_w.resize(plt.SCR_WIDTH * plt.SCR_HEIGHT);
 	model = std::make_unique<Model>("data/buddha.obj");
-	 scene = std::make_unique<Model>("data/cube.obj");
-	//scene = std::make_unique<Model>("data/sponza_tri.ply");
+	scene = std::make_unique<Model>("data/cube.obj");
+	// scene = std::make_unique<Model>("data/sponza_tri.obj");
 	probe_mesh = std::make_unique<Model>("data/probe.ply");
 	light_mesh = std::make_unique<Model>("data/light.obj");
 	skybox = std::make_unique<SkyBox>();
@@ -25,6 +33,7 @@ void App::setup(Platform& plt)
 	Shaders::screenShader = RenderShader{ fs::path{"src/shaders/screen.vert"}, fs::path{"src/shaders/screen.frag"} };
 	Shaders::envShader = RenderShader{ fs::path{"src/shaders/mesh.vert"}, fs::path{"src/shaders/mesh.frag"} };
 	Shaders::castlightShader = RenderShader{ fs::path{"src/shaders/mesh.vert"}, fs::path{"src/shaders/castlight.frag"} };
+	Shaders::segmentShader = RenderShader{ fs::path{"src/shaders/mesh.vert"}, fs::path{"src/shaders/segment.frag"} };
 
 	auto& lightProbe = app->lightProbe;
 	auto& cubeMap = app->_CubeMap;
@@ -36,10 +45,10 @@ void App::setup(Platform& plt)
 	// lightProbe->equirectangular_to_cubemap(app->hdr_RectMap, cubeMap["environment"]);
 	// cubeMap["environment"].generateMipmap();
 
-	//glm::vec3 scene_size{ 18, 7, 11 };
-	//glm::vec3 scene_size{ 15, 7, 7 };
-	 glm::vec3 scene_size{6, 6, 6};
-	app->sh_volume.init(8, scene_size);
+	// glm::vec3 scene_size{ 15, 7, 7 };
+	// app->sh_volume.init(1.5f, 0.25f, scene_size);
+	glm::vec3 scene_size{ 12, 12, 12 };
+	app->sh_volume.init(3.f, 0.25f, scene_size);
 	app->sh_volume.bake();
 
 
@@ -127,6 +136,7 @@ void App::render_imgui()
 	// ImGui::ListBox("skybox", &map_current, map_choices.data(), map_choices.size());
 
 	ImGui::Separator();
+	ImGui::Checkbox("segment", &show_segment);
 	ImGui::Checkbox("render SH probe", &render_SH_probe);
 	ImGui::SliderFloat("sh_shift", &sh_shift, 0, 1);
 	if(ImGui::Button("print SH")){
@@ -138,11 +148,11 @@ void App::render_imgui()
 	ImGui::SliderFloat("intensity", &cast_light_intensity, 0, 300);
 	ImGui::SliderFloat("cutoff", &cast_light_cut_off, 0, 1);
 
-	if(ImGui::DragFloat2("sky_light_pos", sky_light_pos, 0.01, 0, 1)){
+	if(ImGui::DragFloat2("sky_light_pos", sky_light_pos, 0.001, -1, 1)){
 		sky_shadow.set_dir(sky_light_pos[0], sky_light_pos[1]);
 		sky_shadow.render(*scene);
 	}
-	ImGui::SliderFloat("sky_intensity", &sky_intensity, 0, 10);
+	ImGui::SliderFloat3("sky_intensity", sky_intensity, 0, 10);
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 	ImGui::End();
@@ -159,10 +169,10 @@ void App::render_3d()
 	Mat_projection = glm::perspective(glm::radians(camera.Zoom), (float)plt.SCR_WIDTH / (float)plt.SCR_HEIGHT, 0.1f, 100.f);
 
 	if (scene){
-		static auto set_shader = [this]()
+		static auto set_castlightshader = [this]()
 		{
 			Shaders::castlightShader.bind();
-			sh_volume.bind_sh_tex(Shaders::castlightShader);
+			sh_volume.bind_volume_tex(Shaders::castlightShader);
 			Shaders::castlightShader.uniform("view", camera.GetViewMatrix());
 			Shaders::castlightShader.uniform("projection", Mat_projection);
 			Shaders::castlightShader.uniform("light.intensity", cast_light_intensity*glm::vec3(1,1,1));
@@ -176,13 +186,25 @@ void App::render_3d()
 			glBindTexture(GL_TEXTURE_2D, sky_shadow.depthMap);
 			Shaders::castlightShader.uniform("shadowMap", 0);
 			Shaders::castlightShader.uniform("lightSpaceMatrix", sky_shadow.lightSpaceMatrix);
-			Shaders::castlightShader.uniform("sky.intensity", glm::vec3(sky_intensity));
+			Shaders::castlightShader.uniform("sky.intensity", glm::vec3(sky_intensity[0], sky_intensity[1], sky_intensity[2]));
 			Shaders::castlightShader.uniform("sky.direction", sky_shadow.direction);
 			Shaders::castlightShader.uniform("sh", sh);
 			Shaders::castlightShader.uniform("sh_shift", sh_shift);
 		};
-		set_shader();
-		scene->render(Shaders::castlightShader);
+		static auto set_segmentshader = [this]()
+		{
+			Shaders::segmentShader.bind();
+			Shaders::segmentShader.uniform("view", camera.GetViewMatrix());
+			Shaders::segmentShader.uniform("projection", Mat_projection);
+		};
+		if (show_segment){
+			set_segmentshader();
+			scene->render(Shaders::segmentShader);
+		} else {
+			set_castlightshader();
+			scene->render(Shaders::castlightShader);
+		}
+
 	}
 
 	// if (skybox && rotate_env) //rotate env first, then render model
@@ -202,7 +224,7 @@ void App::render_3d()
 		Shaders::envShader.uniform("irradiance", EnvMap("irradiance").active(1));
 		Shaders::envShader.uniform("brdfLUT", brdfLUT.active(2));
 		Shaders::envShader.uniform("prefilterMap", EnvMap("prefilter").active(3));
-		sh_volume.bind_sh_tex(Shaders::envShader);
+		sh_volume.bind_volume_tex(Shaders::envShader);
 
 		Shaders::envShader.uniform("view", camera.GetViewMatrix());
 		Shaders::envShader.uniform("projection", Mat_projection);
@@ -225,20 +247,22 @@ void App::render_3d()
 	};
 
 	set_envshader();
-	light_mesh->Mat_model = glm::translate(glm::mat4(1), glm::vec3(cast_light_position[0],cast_light_position[1],cast_light_position[2]));
-	light_mesh->render(Shaders::envShader);
+	if (light_mesh){
+		light_mesh->Mat_model = glm::translate(glm::mat4(1), glm::vec3(cast_light_position[0],cast_light_position[1],cast_light_position[2]));
+		light_mesh->render(Shaders::envShader);
+	}
 	if (model && render_model)
 	{
 		model->render(Shaders::envShader);
 	}
 	if (probe_mesh && render_SH_probe)
 	{
-		sh_volume.set_volume_filter(GL_NEAREST);
-		for (auto pos : sh_volume.world_position) { //TODO: instance drawing results in [out of memory], why?
+		sh_volume.bind_sh_tex(Shaders::envShader); // probe res, nearest filter
+		for (auto pos : sh_volume.probe_positions) { //TODO: instance drawing results in [out of memory], why?
 			probe_mesh->Mat_model = glm::translate(glm::mat4(1), pos);
 			probe_mesh->render(Shaders::envShader);
 		}
-		sh_volume.set_volume_filter(GL_LINEAR);
+		sh_volume.bind_volume_tex(Shaders::envShader);
 
 	}
 }

@@ -10,16 +10,17 @@ public:
     SH_volume(const SH_volume&) = delete;
     void operator=(const SH_volume&) = delete;
     ~SH_volume();
-    void init (GLsizei, glm::vec3);
+    void init (float, float, glm::vec3);
     void bake();
-    void precompute();
     void relight();
     void print();
     void project_sh();
     void bind_sh_tex(Shader&);
+    void bind_volume_tex(Shader&);
     void set_volume_filter(int FILTER);
     // ComputeShader project_shader{ fs::path{"src/shaders/image_projectSH.comp"} };
     ComputeShader project_shader{ fs::path{"src/shaders/precomp_projectSH.comp"} };
+    ComputeShader transfer2volume_shader{ fs::path{"src/shaders/transfer2volume.comp"} };
     // ComputeShader project_shader{ fs::path{"src/shaders/projectSH.comp"} };
     ComputeShader relight_shader{ fs::path{"src/shaders/relight.comp"} };
     // ComputeShader relight_project_shader{ fs::path{"src/shaders/relight_projectSH.comp"} };
@@ -29,12 +30,16 @@ public:
     SkyBox skybox;
 
     glm::vec3 scene_size;
-    GLsizei probe_res;
+    glm::ivec3 probe_res;
+    glm::ivec3 volume_res;
     // per probe data
     static const int num_sh_tex = 7;
     GLuint sh_tex[num_sh_tex]; //3D texture
     GLuint probe_range; //3D texture
-    std::vector<glm::vec3> world_position;
+    GLuint volume_tex[num_sh_tex]; //3D texture
+    GLuint volume_weight0123; //3D texture
+    GLuint volume_weight4567; //3D texture
+    std::vector<glm::vec3> probe_positions;
     // buffer
     GLuint transfer_buffer, transfer_tex;
     GLuint rad_buffer, rad_tex;
@@ -46,6 +51,10 @@ public:
     GLuint GBuffer_pos;
     GLuint GBuffer_norm;
     GLuint GBuffer_ID;
+private:
+    void precompute();
+    void set_visibility();
+
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.01f, 100.0f);
     
     glm::mat4 captureViews(glm::vec3 position, int face);

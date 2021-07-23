@@ -8,12 +8,6 @@
 #include <sf_libs/Shadinclude.hpp>
 
 
-namespace Shaders {
-    RenderShader brdfShader;
-    RenderShader screenShader;
-    RenderShader envShader;
-    RenderShader castlightShader;
-}
 
 
 // Shader::Shader(std::string vertex_code, std::string fragment_code) { create(vertex_code, fragment_code); }
@@ -109,6 +103,8 @@ void Shader::uniform(std::string name, const glm::mat4 &mat) const {
 }
 
 void Shader::uniform(std::string name, glm::vec3 vec3) const { glUniform3fv(loc(name), 1, &vec3[0]); }
+
+void Shader::uniform(std::string name, glm::ivec3 ivec3) const { glUniform3iv(loc(name), 1, &ivec3[0]); }
 
 void Shader::uniform(std::string name, glm::vec2 vec2) const { glUniform2fv(loc(name), 1, &vec2[0]); }
 
@@ -596,6 +592,7 @@ void LightProbe::equirectangular_to_cubemap(Tex2D &rectTex, CubeMap& cubemap)
 
 
 Paral_Shadow::Paral_Shadow(){
+    near_plane = 0.1, far_plane = 60;
     // configure depth map FBO
     // -----------------------
     glGenFramebuffers(1, &depthMapFBO);
@@ -629,7 +626,7 @@ void Paral_Shadow::set_dir(float up, float dir){
     auto lightProjection = glm::ortho(-30.0f, 30.0f, -30.0f, 30.0f, near_plane, far_plane);
     glm::vec3 up_vec = glm::vec3(0.0, 1.0, 0.0);
     if (up < 0.1 || up > 0.9) up_vec = glm::vec3(0.0, 0.0, 1.0);
-    auto lightView = glm::lookAt(50.f*direction, glm::vec3(0.0f), up_vec);
+    auto lightView = glm::lookAt(30.f*direction, glm::vec3(0.0f), up_vec);
     lightSpaceMatrix = lightProjection * lightView;
 }
 

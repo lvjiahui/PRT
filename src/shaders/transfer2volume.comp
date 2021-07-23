@@ -1,0 +1,150 @@
+#version 430 core
+
+#define THIRD_BAND
+
+#ifdef THIRD_BAND
+#define NUM_COEFF 9
+#else
+#define NUM_COEFF 4
+#endif
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+layout (rgba16f, binding = 0) restrict writeonly uniform image3D SH_volume0; //Ar
+layout (rgba16f, binding = 1) restrict writeonly uniform image3D SH_volume1; //Ag
+layout (rgba16f, binding = 2) restrict writeonly uniform image3D SH_volume2; //Ab
+layout (rgba16f, binding = 3) restrict writeonly uniform image3D SH_volume3; //Br
+layout (rgba16f, binding = 4) restrict writeonly uniform image3D SH_volume4; //Bg
+layout (rgba16f, binding = 5) restrict writeonly uniform image3D SH_volume5; //Bb
+layout (rgba16f, binding = 6) restrict writeonly uniform image3D SH_volume6; //C 
+
+uniform sampler3D SH_Ar;
+uniform sampler3D SH_Ag;
+uniform sampler3D SH_Ab;
+uniform sampler3D SH_Br;
+uniform sampler3D SH_Bg;
+uniform sampler3D SH_Bb;
+uniform sampler3D SH_C;
+uniform sampler3D volume_weight0123;
+uniform sampler3D volume_weight4567;
+
+uniform ivec3 volume_res;
+uniform ivec3 probe_res;
+// uniform vec3 scene_size;
+
+void main(){
+    const ivec3 volume_ID = ivec3(gl_GlobalInvocationID);
+    if(volume_ID.x >= volume_res.x || volume_ID.y >= volume_res.y || volume_ID.z >= volume_res.z)
+        return;
+    const vec4 weight0123 = texelFetch(volume_weight0123, volume_ID, 0);
+    const vec4 weight4567 = texelFetch(volume_weight4567, volume_ID, 0);
+    vec3 volume_pos = (volume_ID + vec3(0.5)) / volume_res; //[0.5/volume_res, 1-0.5/volume_res]
+    volume_pos = volume_pos * probe_res - 0.5; //[-0.5, probe_res-0.5]
+
+	/*
+	*       4----7
+	*      /|   /|
+	*     5----6 |
+	*     | 3--|-2
+	*     |/   |/
+	*     0----1
+	*
+	*     ^ y
+	*     |
+	*     |
+	*     o---->x
+	*    /
+	*   /z
+	*  v
+	*/
+
+    const ivec3 anchor = ivec3(floor(volume_pos));
+    const ivec3 probe_ID0 = anchor + ivec3(0,0,1);
+    const ivec3 probe_ID1 = anchor + ivec3(1,0,1);
+    const ivec3 probe_ID2 = anchor + ivec3(1,0,0);
+    const ivec3 probe_ID3 = anchor + ivec3(0,0,0);
+    const ivec3 probe_ID4 = anchor + ivec3(0,1,0);
+    const ivec3 probe_ID5 = anchor + ivec3(0,1,1);
+    const ivec3 probe_ID6 = anchor + ivec3(1,1,1);
+    const ivec3 probe_ID7 = anchor + ivec3(1,1,0);
+
+    imageStore(SH_volume0, volume_ID, 
+        weight0123[0] * texelFetch(SH_Ar, probe_ID0, 0) +
+        weight0123[1] * texelFetch(SH_Ar, probe_ID1, 0) +
+        weight0123[2] * texelFetch(SH_Ar, probe_ID2, 0) +
+        weight0123[3] * texelFetch(SH_Ar, probe_ID3, 0) +
+        weight4567[0] * texelFetch(SH_Ar, probe_ID4, 0) +
+        weight4567[1] * texelFetch(SH_Ar, probe_ID5, 0) +
+        weight4567[2] * texelFetch(SH_Ar, probe_ID6, 0) +
+        weight4567[3] * texelFetch(SH_Ar, probe_ID7, 0)
+    );
+
+    imageStore(SH_volume1, volume_ID, 
+        weight0123[0] * texelFetch(SH_Ag, probe_ID0, 0) +
+        weight0123[1] * texelFetch(SH_Ag, probe_ID1, 0) +
+        weight0123[2] * texelFetch(SH_Ag, probe_ID2, 0) +
+        weight0123[3] * texelFetch(SH_Ag, probe_ID3, 0) +
+        weight4567[0] * texelFetch(SH_Ag, probe_ID4, 0) +
+        weight4567[1] * texelFetch(SH_Ag, probe_ID5, 0) +
+        weight4567[2] * texelFetch(SH_Ag, probe_ID6, 0) +
+        weight4567[3] * texelFetch(SH_Ag, probe_ID7, 0)
+    );
+
+    imageStore(SH_volume2, volume_ID, 
+        weight0123[0] * texelFetch(SH_Ab, probe_ID0, 0) +
+        weight0123[1] * texelFetch(SH_Ab, probe_ID1, 0) +
+        weight0123[2] * texelFetch(SH_Ab, probe_ID2, 0) +
+        weight0123[3] * texelFetch(SH_Ab, probe_ID3, 0) +
+        weight4567[0] * texelFetch(SH_Ab, probe_ID4, 0) +
+        weight4567[1] * texelFetch(SH_Ab, probe_ID5, 0) +
+        weight4567[2] * texelFetch(SH_Ab, probe_ID6, 0) +
+        weight4567[3] * texelFetch(SH_Ab, probe_ID7, 0)
+    );
+
+#ifdef THIRD_BAND
+    imageStore(SH_volume3, volume_ID, 
+        weight0123[0] * texelFetch(SH_Br, probe_ID0, 0) +
+        weight0123[1] * texelFetch(SH_Br, probe_ID1, 0) +
+        weight0123[2] * texelFetch(SH_Br, probe_ID2, 0) +
+        weight0123[3] * texelFetch(SH_Br, probe_ID3, 0) +
+        weight4567[0] * texelFetch(SH_Br, probe_ID4, 0) +
+        weight4567[1] * texelFetch(SH_Br, probe_ID5, 0) +
+        weight4567[2] * texelFetch(SH_Br, probe_ID6, 0) +
+        weight4567[3] * texelFetch(SH_Br, probe_ID7, 0)
+    );
+
+    imageStore(SH_volume4, volume_ID, 
+        weight0123[0] * texelFetch(SH_Bg, probe_ID0, 0) +
+        weight0123[1] * texelFetch(SH_Bg, probe_ID1, 0) +
+        weight0123[2] * texelFetch(SH_Bg, probe_ID2, 0) +
+        weight0123[3] * texelFetch(SH_Bg, probe_ID3, 0) +
+        weight4567[0] * texelFetch(SH_Bg, probe_ID4, 0) +
+        weight4567[1] * texelFetch(SH_Bg, probe_ID5, 0) +
+        weight4567[2] * texelFetch(SH_Bg, probe_ID6, 0) +
+        weight4567[3] * texelFetch(SH_Bg, probe_ID7, 0)
+    );
+
+    imageStore(SH_volume5, volume_ID, 
+        weight0123[0] * texelFetch(SH_Bb, probe_ID0, 0) +
+        weight0123[1] * texelFetch(SH_Bb, probe_ID1, 0) +
+        weight0123[2] * texelFetch(SH_Bb, probe_ID2, 0) +
+        weight0123[3] * texelFetch(SH_Bb, probe_ID3, 0) +
+        weight4567[0] * texelFetch(SH_Bb, probe_ID4, 0) +
+        weight4567[1] * texelFetch(SH_Bb, probe_ID5, 0) +
+        weight4567[2] * texelFetch(SH_Bb, probe_ID6, 0) +
+        weight4567[3] * texelFetch(SH_Bb, probe_ID7, 0)
+    );
+
+    imageStore(SH_volume6, volume_ID, 
+        weight0123[0] * texelFetch(SH_C, probe_ID0, 0) +
+        weight0123[1] * texelFetch(SH_C, probe_ID1, 0) +
+        weight0123[2] * texelFetch(SH_C, probe_ID2, 0) +
+        weight0123[3] * texelFetch(SH_C, probe_ID3, 0) +
+        weight4567[0] * texelFetch(SH_C, probe_ID4, 0) +
+        weight4567[1] * texelFetch(SH_C, probe_ID5, 0) +
+        weight4567[2] * texelFetch(SH_C, probe_ID6, 0) +
+        weight4567[3] * texelFetch(SH_C, probe_ID7, 0)
+    );
+#endif
+
+}

@@ -61,10 +61,11 @@ public:
 	float roughness = 0.2;
 	std::unique_ptr<SkyBox> skybox;
 	std::unique_ptr<Model> scene;
+	bool show_segment = false;
 	std::unique_ptr<Model> probe_mesh;
 	Paral_Shadow sky_shadow;
 	float sky_light_pos[2] = {0.17, 0.84};
-	float sky_intensity = 5;
+	float sky_intensity[3] = {5,5,5};
 
 	int max_path_length = 2;
 	int sh_resolution = 32;

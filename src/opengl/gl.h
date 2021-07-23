@@ -17,13 +17,6 @@
 
 namespace fs = std::filesystem;
 
-class RenderShader;
-namespace Shaders {
-    extern RenderShader brdfShader;
-    extern RenderShader screenShader;
-    extern RenderShader envShader;
-    extern RenderShader castlightShader;
-} // namespace Shaders
 
 class Shader {
 public:
@@ -39,6 +32,7 @@ public:
 
     void uniform(std::string name, const glm::mat4 &mat) const;
     void uniform(std::string name, glm::vec3 vec3) const;
+    void uniform(std::string name, glm::ivec3 vec3) const;
     void uniform(std::string name, glm::vec2 vec2) const;
     void uniform(std::string name, GLint i) const;
     void uniform(std::string name, GLuint i) const;
@@ -320,5 +314,5 @@ public:
     const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
     GLuint depthMap;
     GLuint depthMapFBO;
-    float near_plane = 0.1, far_plane = 100;
+    float near_plane, far_plane;
 };

@@ -7,27 +7,59 @@
 #include <map>
 #include <random>
 #include <array>
+// #include "cgal/light_probe.h"
+#include "raytracing/light_probe.h"
 
 
-
-void SH_volume::init(GLsizei _probe_res, glm::vec3 _scene_size)
+void SH_volume::init(float target_probe_space, float target_volume_space, glm::vec3 _scene_size)
 {
-	probe_res = _probe_res;
+	//actual space is smaller than target space
+	volume_res = glm::ceil(2.f * _scene_size / target_volume_space);
+	probe_res = glm::ceil(2.f * _scene_size / target_probe_space);
+	fmt::print("probe res: {}x{}x{}\n", probe_res.x, probe_res.y, probe_res.z);
+	fmt::print("volume res: {}x{}x{}\n", volume_res.x, volume_res.y, volume_res.z);
 	scene_size = _scene_size;
 	// sh volume
 	glGenTextures(num_sh_tex, sh_tex);
+	glGenTextures(num_sh_tex, volume_tex);
 	for (int i = 0; i < num_sh_tex; i++) {
 		glBindTexture(GL_TEXTURE_3D, sh_tex[i]);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA16F, probe_res.x, probe_res.y, probe_res.z);
+
+		glBindTexture(GL_TEXTURE_3D, volume_tex[i]);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA16F, probe_res, probe_res, probe_res);
+		// glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		// glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA16F, volume_res.x, volume_res.y, volume_res.z);
 	}
 
-	// probe 
+	glGenTextures(1, &volume_weight0123);
+	glGenTextures(1, &volume_weight4567);
+	glBindTexture(GL_TEXTURE_3D, volume_weight0123);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA16F, volume_res.x, volume_res.y, volume_res.z);
+	glBindTexture(GL_TEXTURE_3D, volume_weight4567);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA16F, volume_res.x, volume_res.y, volume_res.z);
 
+	// probe cubemap
 	glGenTextures(1, &GBuffer_norm);
 	glGenTextures(1, &GBuffer_pos);
 	glGenTextures(1, &GBuffer_ID);
@@ -47,20 +79,14 @@ void SH_volume::init(GLsizei _probe_res, glm::vec3 _scene_size)
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	
-	// float ds = 2*scene_size / (probe_res-1);
-	glm::vec3 ds = 2.f / probe_res * scene_size;
-	for (int z_i = 0; z_i < probe_res; z_i++)
-		for (int y_i = 0; y_i < probe_res; y_i++)
-			for (int x_i = 0; x_i < probe_res; x_i++)
+	//should be consistent with SH.glsl
+	glm::vec3 ds = 2.f / glm::vec3(probe_res) * scene_size;
+	for (int z_i = 0; z_i < probe_res.z; z_i++)
+		for (int y_i = 0; y_i < probe_res.y; y_i++)
+			for (int x_i = 0; x_i < probe_res.x; x_i++)
 			{
-				// if(probe_res == 1) {
-				// 	pos = glm::vec3(0,0,0);
-				// } else {
-				// 	pos = -scene_size + ds* glm::vec3(x_i, y_i ,z_i);
-				// }
 				glm::vec3 pos = -scene_size + ds * (glm::vec3(0.5) + glm::vec3(x_i, y_i ,z_i));
-				world_position.push_back(pos);
+				probe_positions.push_back(pos);
 			}
 
 	
@@ -92,7 +118,7 @@ void SH_volume::init(GLsizei _probe_res, glm::vec3 _scene_size)
 
 	glGenTextures(1, &probe_range);
 	glBindTexture(GL_TEXTURE_3D, probe_range);
-	glTexStorage3D(GL_TEXTURE_3D, 1, GL_RG32UI, probe_res, probe_res, probe_res);
+	glTexStorage3D(GL_TEXTURE_3D, 1, GL_RG32UI, probe_res.x, probe_res.y, probe_res.z);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
@@ -100,7 +126,7 @@ void SH_volume::init(GLsizei _probe_res, glm::vec3 _scene_size)
 void SH_volume::set_volume_filter(int FILTER)
 {
 	for (int i = 0; i < num_sh_tex; i++) {
-		glBindTexture(GL_TEXTURE_3D, sh_tex[i]);
+		glBindTexture(GL_TEXTURE_3D, volume_tex[i]);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, FILTER);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, FILTER);
 	}
@@ -116,11 +142,12 @@ void SH_volume::bake()
 {
 	// precomputed SH and solid angle
 	precompute();
-
+	set_visibility();
 }
 
 
 void SH_volume::precompute(){
+	// glEnable(GL_CULL_FACE);
 
 	auto capture_GBuffer = [this](glm::vec3 pos){
 		GLint m_viewport[4];
@@ -187,7 +214,7 @@ void SH_volume::precompute(){
 		if(std::abs(norm.z) > std::abs(norm.x) &&  std::abs(norm.z) > std::abs(norm.y)){
 			direction = norm.z > 0 ? static_cast<int>(Dir::POSITIVE_Z) : static_cast<int>(Dir::NEGATIVE_Z);
 		}
-		pos = 1.f * (pos + 100.f);
+		pos = glm::floor(1.f * pos);
 		Cluster_ID cluster_ID{static_cast<int>(pos.x), static_cast<int>(pos.y), static_cast<int>(pos.z), direction};
 		if (surfel_ID.find(cluster_ID) == surfel_ID.end()){
 			surfel_ID[cluster_ID] = num_primitive++;
@@ -198,9 +225,9 @@ void SH_volume::precompute(){
 	fmt::print("Baking ..........\n");
 
 
-	int num_probe = probe_res * probe_res * probe_res;
+	int num_probe = probe_res.x * probe_res.y * probe_res.z;
 	for (int i = 0; i < num_probe; i++) {
-		glm::vec3 probe_pos = world_position[i];
+		glm::vec3 probe_pos = probe_positions[i];
 		capture_GBuffer(probe_pos);
 		float sum = 0;
 		std::map<GLuint, SH9> transfer_weight;
@@ -255,14 +282,16 @@ void SH_volume::precompute(){
 	// 	0, 0, 0,
 	// 	probe_res, probe_res, probe_res, 
 	// 	GL_RG_INTEGER, GL_UNSIGNED_INT, range.data());
-	for (int z_i = 0; z_i < probe_res; z_i++)
-		for (int y_i = 0; y_i < probe_res; y_i++)
-			for (int x_i = 0; x_i < probe_res; x_i++)
+	int offset = 0;
+	for (int z_i = 0; z_i < probe_res.z; z_i++)
+		for (int y_i = 0; y_i < probe_res.y; y_i++)
+			for (int x_i = 0; x_i < probe_res.x; x_i++)
 			{
 				glTexSubImage3D(GL_TEXTURE_3D, 0, 
-				x_i, y_i, z_i,
-				1, 1, 1, 
-				GL_RG_INTEGER, GL_UNSIGNED_INT, range.data() + probe_res * (probe_res * z_i + y_i) + x_i);
+					x_i, y_i, z_i,
+					1, 1, 1, 
+					GL_RG_INTEGER, GL_UNSIGNED_INT, range.data() + offset);
+				offset++;
 			}
 
 	// average of cluster
@@ -286,9 +315,26 @@ void SH_volume::precompute(){
 	glBufferData(GL_TEXTURE_BUFFER, num_primitive * 2 * sizeof(glm::vec3), primitive_data.data(), GL_STATIC_DRAW);
 }
 
+void SH_volume::set_visibility(){
+	fmt::print("computing visibility ..........\n");
+	auto weight = calculate_weight(*App::get().scene, probe_res, volume_res, scene_size);
+
+	glBindTexture(GL_TEXTURE_3D, volume_weight0123);
+	glTexSubImage3D(GL_TEXTURE_3D, 0, 
+		0, 0, 0,
+		volume_res.x, volume_res.y, volume_res.z, 
+		GL_RGBA, GL_FLOAT, weight.weight0123.data());
+
+	glBindTexture(GL_TEXTURE_3D, volume_weight4567);
+	glTexSubImage3D(GL_TEXTURE_3D, 0, 
+		0, 0, 0,
+		volume_res.x, volume_res.y, volume_res.z, 
+		GL_RGBA, GL_FLOAT, weight.weight4567.data());
+}
+
 void SH_volume::print()
 {
-	int num_probe = probe_res * probe_res * probe_res;
+	int num_probe = probe_res.x * probe_res.y * probe_res.z;
 
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -310,7 +356,7 @@ inline float random() {
 }
 void SH_volume::relight()
 {
-	int num_probe = probe_res * probe_res * probe_res;
+	int num_probe = probe_res.x * probe_res.y * probe_res.z;
 	auto& app = App::get();
 	relight_shader.bind();
 	relight_shader.uniform("light.intensity", app.cast_light_intensity*glm::vec3(1,1,1));
@@ -325,9 +371,9 @@ void SH_volume::relight()
 	glBindTexture(GL_TEXTURE_2D, app.sky_shadow.depthMap);
 	relight_shader.uniform("shadowMap", 0);
 	relight_shader.uniform("lightSpaceMatrix", app.sky_shadow.lightSpaceMatrix);
-	relight_shader.uniform("sky.intensity", glm::vec3(app.sky_intensity));
+	relight_shader.uniform("sky.intensity", glm::vec3(app.sky_intensity[0], app.sky_intensity[1], app.sky_intensity[2]));
 	relight_shader.uniform("sky.direction", app.sky_shadow.direction);
-	bind_sh_tex(relight_shader);
+	bind_volume_tex(relight_shader);
 	relight_shader.uniform("sh_shift", app.sh_shift);
 	glBindImageTexture(0, rad_tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 	glActiveTexture(GL_TEXTURE1);
@@ -367,7 +413,42 @@ void SH_volume::project_sh()
 	project_shader.uniform("range_ID", texture_unit);
 	texture_unit++;
 
-	glDispatchCompute(probe_res, probe_res, probe_res);
+	glDispatchCompute(probe_res.x, probe_res.y, probe_res.z);
+
+
+	//transfer2volume
+	transfer2volume_shader.bind();
+	for (int i = 0; i < num_sh_tex; i++) {
+		glBindImageTexture(i, volume_tex[i], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	}
+	std::string sh_tex_name[7] = {
+		"SH_Ar",
+		"SH_Ag",
+		"SH_Ab",
+		"SH_Br",
+		"SH_Bg",
+		"SH_Bb",
+		"SH_C"};
+	for (int i = 0; i < num_sh_tex; i++) {
+		int tex_unit = 79 - num_sh_tex + i;
+		glActiveTexture(GL_TEXTURE0 + tex_unit);
+		glBindTexture(GL_TEXTURE_3D, sh_tex[i]);
+		transfer2volume_shader.uniform(sh_tex_name[i], tex_unit);
+	}
+	texture_unit = 0;
+	glActiveTexture(GL_TEXTURE0+texture_unit);
+	glBindTexture(GL_TEXTURE_3D, volume_weight0123);
+	transfer2volume_shader.uniform("volume_weight0123", texture_unit);
+	texture_unit++;
+	glActiveTexture(GL_TEXTURE0+texture_unit);
+	glBindTexture(GL_TEXTURE_3D, volume_weight4567);
+	transfer2volume_shader.uniform("volume_weight4567", texture_unit);
+	texture_unit++;
+
+	transfer2volume_shader.uniform("volume_res", volume_res);
+	transfer2volume_shader.uniform("probe_res", probe_res);
+	// transfer2volume_shader.uniform("scene_size", scene_size);
+	glDispatchCompute((volume_res.x+7)/8, (volume_res.y+7)/8, (volume_res.z+7)/8);
 }
 
 void SH_volume::bind_sh_tex(Shader& shader)
@@ -375,13 +456,27 @@ void SH_volume::bind_sh_tex(Shader& shader)
 	shader.bind();
 	shader.uniform("scene_size", scene_size);
 	for (int i = 0; i < num_sh_tex; i++) {
-		int tex_unit = 16 - num_sh_tex + i;
+		int tex_unit = 79 - num_sh_tex + i;
 		glActiveTexture(GL_TEXTURE0 + tex_unit);
 		glBindTexture(GL_TEXTURE_3D, sh_tex[i]);
 		shader.uniform("SH_volume" + std::to_string(i), tex_unit);
 	}
 }
 
+void SH_volume::bind_volume_tex(Shader& shader)
+{
+	// bind_sh_tex(shader);
+	// return;
+
+	shader.bind();
+	shader.uniform("scene_size", scene_size);
+	for (int i = 0; i < num_sh_tex; i++) {
+		int tex_unit = 79 - num_sh_tex + i;
+		glActiveTexture(GL_TEXTURE0 + tex_unit);
+		glBindTexture(GL_TEXTURE_3D, volume_tex[i]);
+		shader.uniform("SH_volume" + std::to_string(i), tex_unit);
+	}
+}
 
 glm::mat4 SH_volume::captureViews(glm::vec3 position, int face){
     static glm::vec3 fronts[6] =
