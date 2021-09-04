@@ -1,0 +1,145 @@
+#version 430 core
+#define SIZE 64
+
+layout(local_size_x = 1, local_size_y = SIZE) in;
+uniform int probe_res;
+
+uniform sampler2D WorldPos; //packed cubemap
+uniform sampler2D Normal; //packed cubemap
+uniform sampler2D precomp_SH0123;
+uniform sampler2D precomp_SH4567;
+uniform sampler2D precomp_SH8;
+
+layout (rgba16f, binding = 0) restrict uniform image3D SH_Ar;
+layout (rgba16f, binding = 1) restrict uniform image3D SH_Ag;
+layout (rgba16f, binding = 2) restrict uniform image3D SH_Ab;
+layout (rgba16f, binding = 3) restrict uniform image3D SH_Br;
+layout (rgba16f, binding = 4) restrict uniform image3D SH_Bg;
+layout (rgba16f, binding = 5) restrict uniform image3D SH_Bb;
+layout (rgba16f, binding = 6) restrict uniform image3D SH_C;
+shared vec4 tex_irradiance[SIZE][9];
+
+const float c1 = 0.429043, c2 = 0.511664, c3 = 0.743125, c4 = 0.886227, c5 = 0.247708;
+
+#include common/light.glsl
+uniform CastLight light;
+uniform PointLight ambient;
+
+#include common/SH.glsl
+uniform bool multi_bounce;
+uniform float atten;
+
+#include colored_wall.glsl
+
+float max3(vec3 v) {
+  return max (max (v.x, v.y), v.z);
+}
+
+void main()
+{
+    const uint probe_xid = gl_WorkGroupID.x;
+    const uint probe_yid = gl_WorkGroupID.y % probe_res;
+    const uint probe_zid = gl_WorkGroupID.y / probe_res;
+    const ivec3 probe_id = ivec3(probe_xid, probe_yid, probe_zid);
+
+    const uint tex_V = gl_LocalInvocationID.y;
+
+    for(int i = 0; i < 9; i++)
+        tex_irradiance[tex_V][i] = vec4(0,0,0,1);
+
+    for (int face = 0; face < 6; face++){
+        const ivec2 texStart = ivec2(SIZE * 6 * probe_xid + SIZE * face, gl_GlobalInvocationID.y);
+        for(int tex_U = 0; tex_U < SIZE; tex_U++){
+            const ivec2 texCoord = texStart + ivec2(tex_U, 0);
+            const vec3 texel_N = normalize(texelFetch(Normal, texCoord, 0).rgb);
+            const vec3 texel_pos = texelFetch(WorldPos, texCoord, 0).rgb;
+
+            vec3 rad = vec3(0,0,0);
+            rad += Eval_CastLight(light, texel_pos, texel_N);
+            rad += Eval_PointLight(ambient, texel_pos, texel_N);
+            if(multi_bounce){
+                rad += atten * SH_Irad(vec4(texel_N,1), texel_pos) / PI;
+            }
+            const vec3 albedo = get_albedo(texel_pos);
+            rad *= albedo;
+
+            const ivec2 cubeCoord = ivec2(SIZE * face + tex_U, tex_V);
+            const vec4 SH0123 = texelFetch(precomp_SH0123, cubeCoord, 0); // include solid angle weight
+            const vec4 SH4567 = texelFetch(precomp_SH4567, cubeCoord, 0);
+            const float SH8 = texelFetch(precomp_SH8, cubeCoord, 0).x;
+            tex_irradiance[tex_V][0].rgb += rad * SH0123.x ;
+            tex_irradiance[tex_V][1].rgb += rad * SH0123.y;
+            tex_irradiance[tex_V][2].rgb += rad * SH0123.z;
+            tex_irradiance[tex_V][3].rgb += rad * SH0123.w;
+            tex_irradiance[tex_V][4].rgb += rad * SH4567.x;
+            tex_irradiance[tex_V][5].rgb += rad * SH4567.y;
+            tex_irradiance[tex_V][6].rgb += rad * SH4567.z;
+            tex_irradiance[tex_V][7].rgb += rad * SH4567.w;
+            tex_irradiance[tex_V][8].rgb += rad * SH8;
+        }
+    }
+
+
+    barrier();
+
+    // reduce SIZE line
+    for (uint s = SIZE/2; s>0; s>>=1) {
+        if (tex_V < s) {
+            tex_irradiance[tex_V][0] += tex_irradiance[tex_V + s][0];
+            tex_irradiance[tex_V][1] += tex_irradiance[tex_V + s][1];
+            tex_irradiance[tex_V][2] += tex_irradiance[tex_V + s][2];
+            tex_irradiance[tex_V][3] += tex_irradiance[tex_V + s][3];
+            tex_irradiance[tex_V][4] += tex_irradiance[tex_V + s][4];
+            tex_irradiance[tex_V][5] += tex_irradiance[tex_V + s][5];
+            tex_irradiance[tex_V][6] += tex_irradiance[tex_V + s][6];
+            tex_irradiance[tex_V][7] += tex_irradiance[tex_V + s][7];
+            tex_irradiance[tex_V][8] += tex_irradiance[tex_V + s][8];
+        }
+        barrier();
+    }
+
+    if (gl_LocalInvocationID.y < 9){
+      tex_irradiance[0][gl_LocalInvocationID.y] *= (4.0 / SIZE / SIZE); //dudv
+    }
+    barrier();
+    
+    // output
+    if (gl_LocalInvocationID.y == 0){
+        // const uint probe_xid = gl_WorkGroupID.x;
+        // const uint probe_yid = gl_WorkGroupID.y % probe_res;
+        // const uint probe_zid = gl_WorkGroupID.y / probe_res;
+        const ivec3 probe_id = ivec3(probe_xid, probe_yid, probe_zid);
+
+        const vec3 L00 = tex_irradiance[0][0].rgb;
+        const vec3 L1n1= tex_irradiance[0][1].rgb;
+        const vec3 L10 = tex_irradiance[0][2].rgb;
+        const vec3 L1p1= tex_irradiance[0][3].rgb;
+        const vec3 L2n2= tex_irradiance[0][4].rgb;
+        const vec3 L2n1= tex_irradiance[0][5].rgb;
+        const vec3 L20 = tex_irradiance[0][6].rgb;
+        const vec3 L2p1= tex_irradiance[0][7].rgb;
+        const vec3 L2p2= tex_irradiance[0][8].rgb;
+
+        // Linear + constant polynomial terms : 2c2 (L11x + L1−1y + L10z) + c4L00 − c5L20
+        const vec3 SH_Ax = 2*c2*L1p1;
+        const vec3 SH_Ay = 2*c2*L1n1;
+        const vec3 SH_Az = 2*c2*L10;
+        const vec3 SH_Aw = c4*L00 - c5*L20;
+        imageStore(SH_Ar, probe_id, vec4(SH_Ax.r, SH_Ay.r, SH_Az.r, SH_Aw.r));
+        imageStore(SH_Ag, probe_id, vec4(SH_Ax.g, SH_Ay.g, SH_Az.g, SH_Aw.g));
+        imageStore(SH_Ab, probe_id, vec4(SH_Ax.b, SH_Ay.b, SH_Az.b, SH_Aw.b));
+        // 4 of the quadratic polynomials : 2c1 (L2−2xy + L21xz + L2−1yz) +  c3L20z2
+        const vec3 SH_Bxy = 2*c1*L2n2;
+        const vec3 SH_Bxz = 2*c1*L2p1;
+        const vec3 SH_Byz = 2*c1*L2n1;
+        const vec3 SH_Bz2 = c3*L20;
+        imageStore(SH_Br, probe_id, vec4(SH_Bxy.r, SH_Bxz.r, SH_Byz.r, SH_Bz2.r));
+        imageStore(SH_Bg, probe_id, vec4(SH_Bxy.g, SH_Bxz.g, SH_Byz.g, SH_Bz2.g));
+        imageStore(SH_Bb, probe_id, vec4(SH_Bxy.b, SH_Bxz.b, SH_Byz.b, SH_Bz2.b));
+        // Final quadratic polynomial :  c1L22 (x2 - y2)
+        imageStore(SH_C, probe_id, vec4(c1*L2p2, 1));
+        
+    }
+
+    
+}

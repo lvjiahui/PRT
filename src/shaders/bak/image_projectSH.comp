@@ -1,0 +1,172 @@
+#version 430 core
+#define SIZE 64
+
+layout(local_size_x = 1, local_size_y = SIZE) in;
+
+// uniform int probe_res;
+uniform int probe_xid;
+uniform int probe_yid;
+uniform int probe_zid;
+
+
+layout (rgba16f, binding = 0) restrict writeonly uniform image3D SH_Ar;
+layout (rgba16f, binding = 1) restrict writeonly uniform image3D SH_Ag;
+layout (rgba16f, binding = 2) restrict writeonly uniform image3D SH_Ab;
+layout (rgba16f, binding = 3) restrict writeonly uniform image3D SH_Br;
+layout (rgba16f, binding = 4) restrict writeonly uniform image3D SH_Bg;
+layout (rgba16f, binding = 5) restrict writeonly uniform image3D SH_Bb;
+layout (rgba16f, binding = 6) restrict writeonly uniform image3D SH_C;
+// layout (rgba16f, binding = 7) restrict readonly uniform imageCube environment;
+// imageCube is much slower than samplerCube,why?
+uniform samplerCube environment;  
+const float c1 = 0.429043, c2 = 0.511664, c3 = 0.743125, c4 = 0.886227, c5 = 0.247708;
+
+
+shared vec4 tex_irradiance[SIZE][9];
+
+//An Efficient Representation for Irradiance Environment Maps
+float SH00(const vec3 d) {
+  return 0.282095;
+}
+
+float SH1n1(const vec3 d) {
+  return 0.488603 * d.y;
+}
+
+float SH10(const vec3 d) {
+  return 0.488603 * d.z;
+}
+
+float SH1p1(const vec3 d) {
+  return 0.488603 * d.x;
+}
+
+float SH2n2(const vec3 d) {
+  return 1.092548 * d.x * d.y;
+}
+
+float SH2n1(const vec3 d) {
+  return 1.092548 * d.y * d.z;
+}
+
+float SH20(const vec3 d) {
+  return 0.315392 * (3.0 * d.z * d.z - 1);
+}
+
+float SH2p1(const vec3 d) {
+  return 1.092548 * d.x * d.z;
+}
+
+float SH2p2(const vec3 d) {
+  return 0.546274 * (d.x * d.x - d.y * d.y);
+}
+
+vec3 cubeCoordToWorld(ivec3 cubeCoord)
+{
+    vec2 texCoord = vec2(cubeCoord.xy) / SIZE;
+    texCoord = texCoord  * 2.0 - 1.0; // -1..1
+    switch(cubeCoord.z)
+    {
+        case 0: return vec3(1.0, -texCoord.yx); // posx
+        case 1: return vec3(-1.0, -texCoord.y, texCoord.x); //negx
+        case 2: return vec3(texCoord.x, 1.0, texCoord.y); // posy
+        case 3: return vec3(texCoord.x, -1.0, -texCoord.y); //negy
+        case 4: return vec3(texCoord.x, -texCoord.y, 1.0); // posz
+        case 5: return vec3(-texCoord.xy, -1.0); // negz
+    }
+    return vec3(0.0);
+}
+
+void main()
+{
+    const uint tex_V = gl_LocalInvocationID.y;
+
+    for(int i = 0; i < 9; i++)
+        tex_irradiance[tex_V][i] = vec4(0,0,0,1);
+
+    for (int face = 0; face < 6; face++){
+      for(int tex_U = 0; tex_U < SIZE; tex_U++){
+          const ivec3 cubeCoord = ivec3(tex_U, tex_V, face);
+          const vec3 pos = cubeCoordToWorld(cubeCoord);
+          const vec3 worldpos = pos.zxy; // openGL to directX
+          const vec3 N = normalize(worldpos);
+          float fTmp = dot(worldpos, worldpos);
+          float fWt = 1/(sqrt(fTmp)*fTmp);
+          // vec3 radiance = imageLoad(environment, cubeCoord).rgb;
+          vec3 radiance = texture(environment, pos).rgb;
+          radiance = fWt * radiance;
+          tex_irradiance[tex_V][0].rgb += radiance * SH00(N) ;
+          tex_irradiance[tex_V][1].rgb += radiance * SH1n1(N);
+          tex_irradiance[tex_V][2].rgb += radiance * SH10(N) ;
+          tex_irradiance[tex_V][3].rgb += radiance * SH1p1(N);
+          tex_irradiance[tex_V][4].rgb += radiance * SH2n2(N);
+          tex_irradiance[tex_V][5].rgb += radiance * SH2n1(N);
+          tex_irradiance[tex_V][6].rgb += radiance * SH20(N) ;
+          tex_irradiance[tex_V][7].rgb += radiance * SH2p1(N);
+          tex_irradiance[tex_V][8].rgb += radiance * SH2p2(N);
+      }
+    }
+
+
+    barrier();
+
+    // reduce SIZE line
+    for (uint s = SIZE/2; s>0; s>>=1) {
+        if (tex_V < s) {
+            tex_irradiance[tex_V][0] += tex_irradiance[tex_V + s][0];
+            tex_irradiance[tex_V][1] += tex_irradiance[tex_V + s][1];
+            tex_irradiance[tex_V][2] += tex_irradiance[tex_V + s][2];
+            tex_irradiance[tex_V][3] += tex_irradiance[tex_V + s][3];
+            tex_irradiance[tex_V][4] += tex_irradiance[tex_V + s][4];
+            tex_irradiance[tex_V][5] += tex_irradiance[tex_V + s][5];
+            tex_irradiance[tex_V][6] += tex_irradiance[tex_V + s][6];
+            tex_irradiance[tex_V][7] += tex_irradiance[tex_V + s][7];
+            tex_irradiance[tex_V][8] += tex_irradiance[tex_V + s][8];
+        }
+        barrier();
+    }
+
+    if (gl_LocalInvocationID.y < 9){
+      tex_irradiance[0][gl_LocalInvocationID.y] *= (4.0 / SIZE / SIZE); //dudv
+    }
+    barrier();
+    
+    // output
+    if (gl_LocalInvocationID.y == 0){
+        // const uint probe_xid = gl_WorkGroupID.x;
+        // const uint probe_yid = gl_WorkGroupID.y % probe_res;
+        // const uint probe_zid = gl_WorkGroupID.y / probe_res;
+        const ivec3 probe_id = ivec3(probe_xid, probe_yid, probe_zid);
+
+        const vec3 L00 = tex_irradiance[0][0].rgb;
+        const vec3 L1n1= tex_irradiance[0][1].rgb;
+        const vec3 L10 = tex_irradiance[0][2].rgb;
+        const vec3 L1p1= tex_irradiance[0][3].rgb;
+        const vec3 L2n2= tex_irradiance[0][4].rgb;
+        const vec3 L2n1= tex_irradiance[0][5].rgb;
+        const vec3 L20 = tex_irradiance[0][6].rgb;
+        const vec3 L2p1= tex_irradiance[0][7].rgb;
+        const vec3 L2p2= tex_irradiance[0][8].rgb;
+
+        // Linear + constant polynomial terms : 2c2 (L11x + L1−1y + L10z) + c4L00 − c5L20
+        const vec3 SH_Ax = 2*c2*L1p1;
+        const vec3 SH_Ay = 2*c2*L1n1;
+        const vec3 SH_Az = 2*c2*L10;
+        const vec3 SH_Aw = c4*L00 - c5*L20;
+        imageStore(SH_Ar, probe_id, vec4(SH_Ax.r, SH_Ay.r, SH_Az.r, SH_Aw.r));
+        imageStore(SH_Ag, probe_id, vec4(SH_Ax.g, SH_Ay.g, SH_Az.g, SH_Aw.g));
+        imageStore(SH_Ab, probe_id, vec4(SH_Ax.b, SH_Ay.b, SH_Az.b, SH_Aw.b));
+        // 4 of the quadratic polynomials : 2c1 (L2−2xy + L21xz + L2−1yz) +  c3L20z2
+        const vec3 SH_Bxy = 2*c1*L2n2;
+        const vec3 SH_Bxz = 2*c1*L2p1;
+        const vec3 SH_Byz = 2*c1*L2n1;
+        const vec3 SH_Bz2 = c3*L20;
+        imageStore(SH_Br, probe_id, vec4(SH_Bxy.r, SH_Bxz.r, SH_Byz.r, SH_Bz2.r));
+        imageStore(SH_Bg, probe_id, vec4(SH_Bxy.g, SH_Bxz.g, SH_Byz.g, SH_Bz2.g));
+        imageStore(SH_Bb, probe_id, vec4(SH_Bxy.b, SH_Bxz.b, SH_Byz.b, SH_Bz2.b));
+        // Final quadratic polynomial :  c1L22 (x2 - y2)
+        imageStore(SH_C, probe_id, vec4(c1*L2p2, 1));
+        
+    }
+
+}

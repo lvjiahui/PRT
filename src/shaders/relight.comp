@@ -1,0 +1,88 @@
+#version 430 core
+#define NUM_SAMPLE 128
+
+layout(local_size_x = 128) in;
+
+
+float rand(float n){
+    return fract(sin(n) * 43758.5453123);
+}
+
+const float temp_weight = 0.1;
+uniform samplerBuffer primitive_vert;
+layout (rgba32f, binding = 0) uniform imageBuffer radiance;
+uniform float seed_u;
+uniform float seed_v;
+uniform int num_primitive;
+uniform mat4 lightSpaceMatrix;
+
+
+#include common/light.glsl
+uniform CastLight light;
+uniform PointLight ambient;
+uniform ParalLight sky;
+
+#include common/SH.glsl
+uniform bool multi_bounce;
+uniform float atten;
+uniform float sh_shift;
+
+#include colored_wall.glsl
+#include common/paral_shadow.glsl
+
+void main()
+{
+    int primitive_ID = int(gl_GlobalInvocationID.x);
+    if (primitive_ID < num_primitive){
+
+        // const vec3 v0 = texelFetch(primitive_vert, 3*primitive_ID+0).rgb;
+        // const vec3 v1 = texelFetch(primitive_vert, 3*primitive_ID+1).rgb;
+        // const vec3 v2 = texelFetch(primitive_vert, 3*primitive_ID+2).rgb;
+        // const vec3 v01 = (v1-v0);
+        // const vec3 v02 = (v2-v0);
+        // const vec3 N = normalize(cross(v01,v02));
+
+        // vec3 rad = vec3(0, 0, 0);
+        // for (int i = 0; i < NUM_SAMPLE; i ++){
+        //     float u = rand(seed_u + primitive_ID + i);
+        //     float v = rand(seed_v + primitive_ID + i);
+        //     if (u + v > 1) {
+        //         u = 1 - u;
+        //         v = 1 - v;
+        //     }
+        //     vec3 pos = v0 + u*v01 + v*v02;
+        //     vec3 albedo = get_albedo(pos);
+
+        //     float shadow = ShadowCalculation(lightSpaceMatrix * vec4(pos, 1.0), sky.direction, N);
+        //     rad += albedo * (
+        //         (1-shadow) * Eval_ParalLight(sky, N)
+        //         + Eval_CastLight(light, pos, N)
+        //         + Eval_PointLight(ambient, pos, N)
+        //         );
+        //     if(multi_bounce){
+        //         rad += albedo * atten * SH_Irad(vec4(N,1), pos + sh_shift*N) / PI;
+        //     }
+        // }
+        // rad /= NUM_SAMPLE;
+
+        const vec3 pos = texelFetch(primitive_vert, 2*primitive_ID+0).rgb;
+        const vec3 albedo = get_albedo(pos);
+        const vec3 N = texelFetch(primitive_vert, 2*primitive_ID+1).rgb;
+        float shadow = ShadowCalculation(lightSpaceMatrix * vec4(pos, 1.0), sky.direction, N);
+        vec3 rad = albedo * (
+            (1-shadow) * Eval_ParalLight(sky, N)
+            + Eval_CastLight(light, pos, N)
+            + Eval_PointLight(ambient, pos, N)
+            );
+        if(multi_bounce){
+            rad += albedo * atten * SH_Irad(vec4(N,1), pos + sh_shift*N) / PI;
+        }
+
+        rad = temp_weight*rad + (1-temp_weight)*imageLoad(radiance, primitive_ID).rgb;
+        imageStore(radiance, primitive_ID, vec4(rad,1));   
+
+    }
+
+
+    
+}

@@ -12,31 +12,27 @@
 #include <glm/ext/matrix_clip_space.hpp> // glm::perspective
 #include <glm/ext/scalar_constants.hpp> // glm::pi
 
+
+#define NONCOPYABLE(Type) Type(const Type&)=delete; Type& operator=(const Type&)=delete
+
 namespace fs = std::filesystem;
 
-class Shader;
-namespace Shaders {
-    extern Shader brdfShader;
-    extern Shader screenShader;
-
-} // namespace Shaders
 
 class Shader {
 public:
-    Shader();
-    Shader(std::string vertex_code, std::string fragment_code);
-    Shader(fs::path vertex_path, fs::path fragment_path);
-    Shader(const Shader &src) = delete;
+    NONCOPYABLE(Shader);
+    Shader() {};
     Shader(Shader &&src);
     ~Shader();
+    void load(std::vector<fs::path> shader_paths);
 
-    void operator=(const Shader &src) = delete;
     void operator=(Shader &&src);
 
     void bind() const;
 
     void uniform(std::string name, const glm::mat4 &mat) const;
     void uniform(std::string name, glm::vec3 vec3) const;
+    void uniform(std::string name, glm::ivec3 vec3) const;
     void uniform(std::string name, glm::vec2 vec2) const;
     void uniform(std::string name, GLint i) const;
     void uniform(std::string name, GLuint i) const;
@@ -45,22 +41,37 @@ public:
     void uniform(std::string name, int count, const glm::vec2 items[]) const;
     void uniform(std::string name, int count, const glm::vec3 items[]) const;
     void uniform_block(std::string name, GLuint i) const;
+    virtual void create_shader() = 0;
 
-private:
-    void load(std::string vertex_code, std::string fragment_code);
+protected:
     GLuint loc(std::string name) const;
-    static bool validate(GLuint program, std::string code={});
+    static bool check_compiled(GLuint shader, std::string code={});
+    static bool check_linked(GLuint program);
 
     GLuint program = 0;
-    GLuint v = 0, f = 0;
+    std::vector<std::string> shader_codes;
+    std::vector<GLuint> shaders;
 
     void destroy();
 };
 
+class RenderShader : public Shader {
+public:
+    RenderShader() {};
+    RenderShader(std::initializer_list<fs::path> shader_paths) { load(shader_paths); }
+    void create_shader() override;
+};
+
+class ComputeShader : public Shader {
+public:
+    ComputeShader() {};
+    ComputeShader(std::initializer_list<fs::path> shader_paths) { load(shader_paths); }
+    void create_shader() override;
+};
 
 class Mesh {
 public:
-    Shader meshShader = Shader{ fs::path{"src/opengl/mesh.vert"}, fs::path{"src/opengl/mesh.frag"} };
+    NONCOPYABLE(Mesh);
     typedef GLuint Index;
     struct Vert {
         glm::vec3 pos;
@@ -71,14 +82,13 @@ public:
 
     Mesh();
     Mesh(std::vector<Vert> &&vertices, std::vector<Index> &&indices);
-    Mesh(const Mesh &src) = delete;
     Mesh(Mesh &&src);
     ~Mesh();
 
-    void operator=(const Mesh &src) = delete;
     void operator=(Mesh &&src);
 
-    void render();
+    void render(Shader& shader);
+    void instance_render(int num);
     void recreate(std::vector<Vert> &&vertices, std::vector<Index> &&indices);
     std::vector<Vert> &edit_verts();
     std::vector<Index> &edit_indices();
@@ -103,28 +113,27 @@ private:
 
 class Framebuffer{
 public:
+    NONCOPYABLE(Framebuffer);
     Framebuffer();
-    Framebuffer(const Framebuffer &src) = delete;
-    void operator=(const Framebuffer &src) = delete;
     void bind();
     ~Framebuffer();
 private:
-    GLuint framebuffer;
-    GLuint renderbuffer;
+    GLuint framebufferobject;
+    GLuint depthbuffer;
 };
 
 class Tex2D {
 public:
+    NONCOPYABLE(Tex2D);
     Tex2D() = default;
-    Tex2D(const Tex2D &src) = delete;
     Tex2D(Tex2D &&src);
     ~Tex2D();
 
-    void operator=(const Tex2D &src) = delete;
+
     void operator=(Tex2D &&src);
 
-    void imagei(int w, int h, unsigned char *img = nullptr);
-    void imagef(int w, int h, float *img = nullptr);
+    void imagei(int w, int h, unsigned char *img = nullptr); //source:rgba
+    void imagef(int w, int h, float *img = nullptr); //source:rgb
     GLuint get_id() const;
     GLint active(int unit = 0) const;
     template<typename Renderable>
@@ -187,6 +196,7 @@ private:
 
 class Quad{
 public:
+    NONCOPYABLE(Quad);
     Quad();
     void render();
 private:
@@ -202,7 +212,8 @@ private:
 
 class SkyBox {
 public:
-    Shader skyboxShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/skybox.frag"} };
+    NONCOPYABLE(SkyBox);
+    RenderShader skyboxShader = RenderShader{ fs::path{"src/shaders/skybox.vert"}, fs::path{"src/shaders/skybox.frag"} };
     SkyBox();
     void create();
     void setShader();
@@ -268,9 +279,9 @@ public:
 
 private:
     SkyBox &skybox;
-    Shader rectangleShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/rectangle2cube.frag"} };
-    Shader irradianceShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/irradiance.frag"} };
-    Shader prefilterShader = Shader{ fs::path{"src/opengl/skybox.vert"}, fs::path{"src/opengl/prefilter.frag"} };
+    RenderShader rectangleShader = RenderShader{ fs::path{"src/shaders/skybox.vert"}, fs::path{"src/shaders/rectangle2cube.frag"} };
+    RenderShader irradianceShader = RenderShader{ fs::path{"src/shaders/skybox.vert"}, fs::path{"src/shaders/irradiance.frag"} };
+    RenderShader prefilterShader = RenderShader{ fs::path{"src/shaders/skybox.vert"}, fs::path{"src/shaders/prefilter.frag"} };
 
     // set up projection and view matrices for capturing data onto the 6 cubemap face directions
     // ----------------------------------------------------------------------------------------------
@@ -284,4 +295,24 @@ private:
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
     };
+};
+
+class Model;
+
+class Paral_Shadow{
+public:
+    NONCOPYABLE(Paral_Shadow);
+    Paral_Shadow();
+    ~Paral_Shadow();
+
+    void render(Model&);
+    void set_dir(float, float);
+    RenderShader shadow_depth_shader{ fs::path{"src/shaders/shadow_depth.vert"}, fs::path{"src/shaders/shadow_depth.frag"} };
+    glm::vec3 direction;
+    glm::mat4 lightSpaceMatrix{1};
+    // const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+    const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
+    GLuint depthMap;
+    GLuint depthMapFBO;
+    float near_plane, far_plane;
 };

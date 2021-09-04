@@ -3,69 +3,67 @@
 #include "util/log.h"
 #include "util/util.h"
 #include <fstream>
+#include <sstream>
 #include <sf_libs/stb_image.h>
+#include <sf_libs/Shadinclude.hpp>
 
 
-namespace Shaders {
-    Shader brdfShader;
-    Shader screenShader;
 
-}
 
-Shader::Shader() {}
+// Shader::Shader(std::string vertex_code, std::string fragment_code) { create(vertex_code, fragment_code); }
 
-Shader::Shader(std::string vertex_code, std::string fragment_code) { load(vertex_code, fragment_code); }
-
-Shader::Shader(fs::path vertex_path, fs::path fragmentPath)
+void Shader::load(std::vector<fs::path> shader_paths)
 {
-    // 1. retrieve the vertex/fragment source code from filePath
-    std::string vertexCode;
-    std::string fragmentCode;
-    std::ifstream vShaderFile;
-    std::ifstream fShaderFile;
-    // ensure ifstream objects can throw exceptions:
-    vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    try
-    {
-        // open files
-        vShaderFile.open(vertex_path);
-        fShaderFile.open(fragmentPath);
-        std::stringstream vShaderStream, fShaderStream;
-        // read file's buffer contents into streams
-        vShaderStream << vShaderFile.rdbuf();
-        fShaderStream << fShaderFile.rdbuf();
-        // close file handlers
-        vShaderFile.close();
-        fShaderFile.close();
-        // convert stream into string
-        vertexCode = vShaderStream.str();
-        fragmentCode = fShaderStream.str();
+
+    for(auto &path : shader_paths){
+        std::string shader_code = Shadinclude::load(path.string(), "#include");
+        shader_codes.push_back(shader_code);
+        //save to shaders/generated/
+        std::ofstream out_file("src/shaders/generated/" + path.filename().string());
+		if (!out_file.is_open())
+		{
+			fmt::print(stderr, "cannot write file to src/shaders/generated/ \n");
+		} else {
+            out_file << shader_code;
+            out_file.close();
+        }
     }
-    catch (std::ifstream::failure& e)
-    {
-        fmt::print("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
+
+    program = glCreateProgram();
+    create_shader();
+    assert(shaders.size() == shader_codes.size());
+
+    for(int i = 0; i < shaders.size(); i++){
+        const GLchar *code_c = shader_codes[i].c_str();
+        glShaderSource(shaders[i], 1, &code_c, NULL);
+        glCompileShader(shaders[i]);
+        if (!check_compiled(shaders[i], code_c)) {
+            destroy();
+            return;
+        }
+        glAttachShader(program, shaders[i]);
     }
-    load(vertexCode, fragmentCode);
+    
+    glLinkProgram(program);
+    if (!check_linked(program)) {
+        destroy();
+        return;
+    }
 }
 
 Shader::Shader(Shader &&src) {
     program = src.program;
     src.program = 0;
-    v = src.v;
-    src.v = 0;
-    f = src.f;
-    src.f = 0;
+    shader_codes = std::move(src.shader_codes);
+    shaders = std::move(src.shaders);
 }
 
 void Shader::operator=(Shader &&src) {
     destroy();
     program = src.program;
     src.program = 0;
-    v = src.v;
-    src.v = 0;
-    f = src.f;
-    src.f = 0;
+    shader_codes = std::move(src.shader_codes);
+    shaders = std::move(src.shaders);
 }
 
 Shader::~Shader() { destroy(); }
@@ -78,10 +76,11 @@ void Shader::destroy() {
         return;
 
     glUseProgram(0);
-    glDeleteShader(v);
-    glDeleteShader(f);
+    for(auto shader : shaders)
+        glDeleteShader(shader);
     glDeleteProgram(program);
-    v = f = program = 0;
+    shader_codes.clear();
+    shaders.clear();
 }
 
 void Shader::uniform_block(std::string name, GLuint i) const {
@@ -105,6 +104,8 @@ void Shader::uniform(std::string name, const glm::mat4 &mat) const {
 
 void Shader::uniform(std::string name, glm::vec3 vec3) const { glUniform3fv(loc(name), 1, &vec3[0]); }
 
+void Shader::uniform(std::string name, glm::ivec3 ivec3) const { glUniform3iv(loc(name), 1, &ivec3[0]); }
+
 void Shader::uniform(std::string name, glm::vec2 vec2) const { glUniform2fv(loc(name), 1, &vec2[0]); }
 
 void Shader::uniform(std::string name, GLint i) const { glUniform1i(loc(name), i); }
@@ -115,49 +116,27 @@ void Shader::uniform(std::string name, bool b) const { glUniform1i(loc(name), b)
 
 GLuint Shader::loc(std::string name) const { 
     auto location = glGetUniformLocation(program, name.c_str());
-    assert(location!=-1);
+    if(location == -1){
+        fmt::print("can not locale {}\n", name);
+        assert(false);
+    }
     return location; 
 }
 
-void Shader::load(std::string vertex_code, std::string fragment_code) {
 
-    v = glCreateShader(GL_VERTEX_SHADER);
-    f = glCreateShader(GL_FRAGMENT_SHADER);
-    const GLchar *vs_c = vertex_code.c_str();
-    const GLchar *fs_c = fragment_code.c_str();
-    glShaderSource(v, 1, &vs_c, NULL);
-    glShaderSource(f, 1, &fs_c, NULL);
-    glCompileShader(v);
-    glCompileShader(f);
-
-    if (!validate(v, vs_c)) {
-        destroy();
-        return;
-    }
-    if (!validate(f, fs_c)) {
-        destroy();
-        return;
-    }
-
-    program = glCreateProgram();
-    glAttachShader(program, v);
-    glAttachShader(program, f);
-    glLinkProgram(program);
-}
-
-bool Shader::validate(GLuint program, std::string code) {
+bool Shader::check_compiled(GLuint shader, std::string code) {
 
     GLint compiled = 0;
-    glGetShaderiv(program, GL_COMPILE_STATUS, &compiled);
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
     if (compiled == GL_FALSE) {
 
         GLint len = 0;
-        glGetShaderiv(program, GL_INFO_LOG_LENGTH, &len);
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
 
         GLchar *msg = new GLchar[len];
-        glGetShaderInfoLog(program, len, &len, msg);
+        glGetShaderInfoLog(shader, len, &len, msg);
 
-        warn("Shader %d failed to compile: %s \n %s", program, msg, code.c_str());
+        warn("Shader %d failed to compile: %s \n %s", shader, msg, code.c_str());
         delete[] msg;
 
         return false;
@@ -165,8 +144,34 @@ bool Shader::validate(GLuint program, std::string code) {
     return true;
 }
 
+bool Shader::check_linked(GLuint program) {
 
+    GLint linked = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &linked);
+    if (linked == GL_FALSE) {
 
+        GLint len = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
+
+        GLchar *msg = new GLchar[len];
+        glGetProgramInfoLog(program, len, &len, msg);
+
+        warn("program %d failed to link: %s \n", program, msg);
+        delete[] msg;
+
+        return false;
+    }
+    return true;
+}
+
+void RenderShader::create_shader(){
+    shaders.push_back(glCreateShader(GL_VERTEX_SHADER));
+    shaders.push_back(glCreateShader(GL_FRAGMENT_SHADER));
+}
+
+void ComputeShader::create_shader(){
+    shaders.push_back(glCreateShader(GL_COMPUTE_SHADER));
+}
 
 Mesh::Mesh() { create(); }
 
@@ -286,39 +291,11 @@ const std::vector<Mesh::Vert>& Mesh::verts() const { return _verts; }
 
 const std::vector<Mesh::Index>& Mesh::indices() const { return _idxs; }
 
-void Mesh::render() {
+void Mesh::render(Shader& shader) {
     if (dirty)
         update();
-    auto& app = App::get();
-    meshShader.bind();
+	shader.uniform("model", Mat_model);
     glBindVertexArray(vao);
-    // meshShader.uniform("environment", app.EnvMap("environment").active(0));
-    meshShader.uniform("irradiance", app.EnvMap("irradiance").active(1));
-    meshShader.uniform("brdfLUT", app.brdfLUT.active(2));
-    meshShader.uniform("prefilterMap", app.EnvMap("prefilter").active(3));
-
-    meshShader.uniform("model", Mat_model);
-    meshShader.uniform("view", app.camera.GetViewMatrix());
-    meshShader.uniform("projection", app.Mat_projection);
-    meshShader.uniform("cameraPos", app.camera.Position);
-    auto Mat_rotate = glm::mat4(glm::mat3(Mat_model));
-    auto sh = rotate_sh(app.env_sh, glm::transpose(Mat_rotate) * app.skybox->Mat_rotate);
-    meshShader.uniform("env_sh", sh.size(), sh.data());
-    meshShader.uniform("sh", app.sh);
-    meshShader.uniform("envRotate", glm::transpose(app.skybox->Mat_rotate));
-
-    meshShader.uniform("tonemap", app.tonemap);
-    meshShader.uniform("gamma", app.gamma);
-
-    meshShader.uniform("metal", app.metal);
-    meshShader.uniform("diffuse", app.diffuse);
-    meshShader.uniform("specular", app.specular);
-    meshShader.uniform("roughness", app.roughness);
-    if (app.metal)
-        meshShader.uniform("F0", glm::vec3{app.F0[0],app.F0[1],app.F0[2]});
-    else
-        meshShader.uniform("F0", glm::vec3{0.04});
-    meshShader.uniform("albedo", glm::vec3{app.albedo[0],app.albedo[1],app.albedo[2]});
     glDrawElements(GL_TRIANGLES, n_elem, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
 }
@@ -326,20 +303,20 @@ void Mesh::render() {
 Framebuffer::Framebuffer(){
     // setup framebuffer
     // ----------------------
-    glGenFramebuffers(1, &framebuffer);
-    glGenRenderbuffers(1, &renderbuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, framebuffer);
+    glGenFramebuffers(1, &framebufferobject);
+    glGenRenderbuffers(1, &depthbuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufferobject);
+    glBindRenderbuffer(GL_RENDERBUFFER, depthbuffer);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, framebufferobject);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 void Framebuffer::bind(){
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufferobject);
 }
 
 Framebuffer::~Framebuffer(){
-    glDeleteFramebuffers(1, &framebuffer);
-    glDeleteRenderbuffers(1, &renderbuffer);
+    glDeleteFramebuffers(1, &framebufferobject);
+    glDeleteRenderbuffers(1, &depthbuffer);
 }
 
 
@@ -386,7 +363,7 @@ void Tex2D::imagef(int _w, int _h, float *img) {
     if (!id)
         glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, w, h, 0, GL_RGB, GL_FLOAT, img);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGB, GL_FLOAT, img);
     setup();
     glBindTexture(GL_TEXTURE_2D, 0);
 }
@@ -614,3 +591,57 @@ void LightProbe::equirectangular_to_cubemap(Tex2D &rectTex, CubeMap& cubemap)
 }
 
 
+Paral_Shadow::Paral_Shadow(){
+    near_plane = 0.1, far_plane = 60;
+    // configure depth map FBO
+    // -----------------------
+    glGenFramebuffers(1, &depthMapFBO);
+    // create depth texture
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    // attach depth texture as FBO's depth buffer
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+Paral_Shadow::~Paral_Shadow(){
+    glDeleteFramebuffers(1, &depthMapFBO);
+    glDeleteTextures(1, &depthMap);
+}
+
+void Paral_Shadow::set_dir(float up, float dir){
+    float theta = PI * up;
+	float phi = 2*PI * dir;
+    direction = glm::vec3(sin(theta) * sin(phi), cos(theta), sin(theta) * cos(phi));
+    auto lightProjection = glm::ortho(-30.0f, 30.0f, -30.0f, 30.0f, near_plane, far_plane);
+    glm::vec3 up_vec = glm::vec3(0.0, 1.0, 0.0);
+    if (up < 0.1 || up > 0.9) up_vec = glm::vec3(0.0, 0.0, 1.0);
+    auto lightView = glm::lookAt(30.f*direction, glm::vec3(0.0f), up_vec);
+    lightSpaceMatrix = lightProjection * lightView;
+}
+
+void Paral_Shadow::render(Model& scene){
+    shadow_depth_shader.bind();
+    shadow_depth_shader.uniform("lightSpaceMatrix", lightSpaceMatrix);
+
+    GLint m_viewport[4];
+    glGetIntegerv(GL_VIEWPORT, m_viewport);
+
+    glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    scene.render(shadow_depth_shader);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+}

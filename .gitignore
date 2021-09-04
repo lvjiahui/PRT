@@ -1,3 +1,5 @@
 .vscode
 build
 deps/**/doc
+src/shaders/generated
+imgui.ini
